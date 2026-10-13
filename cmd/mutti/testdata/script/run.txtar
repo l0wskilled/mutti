@@ -59,6 +59,8 @@ eventually 60 sh -c '[ "$(docker ps -aq --filter name='$MUTTI_TEST_RUN'-run- | w
 ! exec mutti run -- sh -c 'kill -9 $PPID'
 eventually 60 sh -c '[ "$(docker ps -aq --filter name='$MUTTI_TEST_RUN'-run- | wc -l)" = 0 ]'
 eventually 30 sh -c '[ "$(docker volume ls -q --filter name='$MUTTI_TEST_RUN'-run- | wc -l)" = 0 ]'
+# The reaper outlives its work for a moment, and sweep leaves runs with a live reaper alone.
+eventually 60 sh -c 'for id in $(docker network ls --filter name='$MUTTI_TEST_RUN'-run- --format "{{.Label \"mutti.run\"}}"); do [ -z "$(docker ps -q --filter label=mutti.reaper=$id)" ] || exit 1; done'
 exec mutti sweep
 exec sh -c 'docker network ls -q --filter name='$MUTTI_TEST_RUN'-run- | wc -l'
 stdout '^0$'
