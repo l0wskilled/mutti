@@ -1,0 +1,7 @@
+services:
+  web:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "80", "-h", "/www"]
+    init: true
+    ports: ["8080:80"]
+    volumes: ["./www:/www"]

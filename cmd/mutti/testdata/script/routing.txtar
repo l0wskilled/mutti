@@ -1,0 +1,81 @@
+# The router serves every instance under its own hostname, over HTTP and HTTPS with mutti's CA,
+# with host and path routes. Inside an instance, its hostnames reach the router; another
+# instance's names do not resolve.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+mkdir shop/api/api shop/www
+cp ping.txt shop/api/api/ping.txt
+cp index.html shop/www/index.html
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+exec git -C shop worktree add -q -b feature ../shop-feature
+
+exec mutti -C shop up
+stdout 'is up: https://'$MUTTI_TEST_RUN'.localhost:'$MUTTI_HTTPS_PORT
+exec mutti -C shop-feature up
+
+# Each instance answers on its own hostname with its own content.
+exec curl -sSf --resolve $MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/name.txt
+stdout '^'$MUTTI_TEST_RUN'$'
+exec curl -sSf --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/name.txt
+stdout '^'$MUTTI_TEST_RUN'-feature$'
+
+# HTTPS with a certificate of mutti's CA.
+exec curl -sSf --cacert $XDG_DATA_HOME/mutti/ca/ca.pem --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/name.txt
+stdout '^'$MUTTI_TEST_RUN'-feature$'
+
+# Host route and path route to the api.
+exec curl -sSf --cacert $XDG_DATA_HOME/mutti/ca/ca.pem --resolve api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/api/ping.txt
+stdout '^pong$'
+exec curl -sSf --resolve $MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/api/ping.txt
+stdout '^pong$'
+
+# Inside an instance its own hostnames reach the router; the other instance's do not resolve.
+exec mutti -C shop exec web -- wget -qO- http://api.$MUTTI_TEST_RUN.localhost/api/ping.txt
+stdout '^pong$'
+! exec mutti -C shop exec web -- wget -T 3 -qO- http://api.feature.$MUTTI_TEST_RUN.localhost/api/ping.txt
+stderr 'bad address'
+! exec mutti -C shop exec web -- nslookup $MUTTI_TEST_RUN-feature-api-1
+stdout 'NXDOMAIN|can.t find'
+
+exec mutti list
+stdout '^'$MUTTI_TEST_RUN' .*https://'$MUTTI_TEST_RUN'.localhost:'$MUTTI_HTTPS_PORT
+
+# Taking an instance down removes its routes; destroying it frees its network.
+exec mutti -C shop-feature down
+! exec curl -sf --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/name.txt
+exec mutti router status
+stdout 'routing 1 instance'
+exec mutti -C shop-feature destroy --yes
+exec mutti -C shop destroy --yes
+exec mutti router status
+stdout 'routing 0 instance'
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+  main: web
+  routes:
+    api: {path: /api}
+  hooks:
+    bootstrap:
+      - service: web
+        run: echo "$$MUTTI_INSTANCE" > /www/name.txt
+services:
+  web:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "80", "-h", "/www"]
+    init: true
+    ports: ["8080:80"]
+    volumes: ["./www:/www"]
+  api:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "8000", "-h", "/srv"]
+    init: true
+    ports: ["8000:8000"]
+    volumes: ["./api:/srv"]
+-- ping.txt --
+pong
+-- index.html --
+hello

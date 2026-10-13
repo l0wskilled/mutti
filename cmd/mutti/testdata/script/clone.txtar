@@ -1,0 +1,51 @@
+# worktree add --data-from copies the volumes of another instance into the new one, runs the
+# after-clone hooks instead of bootstrap, and leaves the source running.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+cd shop
+
+exec mutti up
+exec mutti exec -u service db -- sh -c 'echo "written in main" > /data/note'
+
+exec mutti worktree add copy --data-from main
+stdout 'Data copied from main: data'
+exec mutti -C ../shop-copy exec db -- cat /data/note
+stdout '^written in main$'
+exec mutti -C ../shop-copy exec db -- cat /data/seeded-by
+stdout '^'$MUTTI_TEST_RUN'$'
+exec mutti -C ../shop-copy exec db -- cat /data/after-clone
+stdout '^'$MUTTI_TEST_RUN'-copy$'
+
+# The source runs on, and the copy is independent of it.
+exec mutti status
+stdout 'db +Up'
+exec mutti -C ../shop-copy exec -u service db -- sh -c 'echo "changed in copy" > /data/note'
+exec mutti exec db -- cat /data/note
+stdout '^written in main$'
+
+exec mutti worktree remove copy --yes
+exec mutti destroy --yes
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+  hooks:
+    bootstrap:
+      - service: db
+        run: echo "$$MUTTI_INSTANCE" > /data/seeded-by
+        user: service
+    after-clone:
+      - service: db
+        run: echo "$$MUTTI_INSTANCE" > /data/after-clone
+        user: service
+services:
+  db:
+    image: busybox:1.37
+    command: ["sleep", "infinity"]
+    init: true
+    volumes: ["data:/data"]
+volumes:
+  data:

@@ -1,0 +1,37 @@
+{
+  "Name": "mutti-router",
+  "Image": "traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+  "Cmd": [
+    "--entryPoints.web.address=:80",
+    "--entryPoints.websecure.address=:443",
+    "--entryPoints.websecure.http.tls=true",
+    "--providers.file.directory=/etc/mutti/dynamic",
+    "--providers.file.watch=true",
+    "--ping=true",
+    "--ping.manualRouting=true",
+    "--log.level=WARN",
+    "--global.checkNewVersion=false",
+    "--global.sendAnonymousUsage=false"
+  ],
+  "Labels": {
+    "mutti.role": "router",
+    "mutti.router.version": "10c39628e2e1",
+    "mutti.schema": "1"
+  },
+  "Ports": [
+    {
+      "HostIP": "127.0.0.1",
+      "HostPort": 80,
+      "ContainerPort": 80,
+      "Proto": "tcp"
+    },
+    {
+      "HostIP": "127.0.0.1",
+      "HostPort": 443,
+      "ContainerPort": 443,
+      "Proto": "tcp"
+    }
+  ],
+  "Mounts": null,
+  "Restart": "unless-stopped"
+}

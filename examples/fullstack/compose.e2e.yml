@@ -1,0 +1,5 @@
+# The test runner of mutti run --overlay e2e --service e2e-runner -- <command>
+services:
+  e2e-runner:
+    image: busybox:1.37
+    profiles: [e2e]

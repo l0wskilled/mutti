@@ -1,0 +1,19 @@
+# A single-page app and its API on one origin: the browser calls /api on the app's own host.
+x-mutti:
+  main: web
+  routes:
+    web: {}
+    api: { path: /api, port: 8000 } # https://<instance>/api and https://api.<instance>
+
+services:
+  web:
+    image: nginx:1.29-alpine
+    volumes: ["./web:/usr/share/nginx/html:ro"]
+    expose: ["80"]
+
+  api:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "8000", "-h", "/www"]
+    init: true
+    expose: ["8000"]
+    volumes: ["./api:/www:ro"]

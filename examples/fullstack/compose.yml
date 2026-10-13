@@ -1,0 +1,82 @@
+# A typical multi-service app in miniature: no app code, tiny public images.
+x-mutti:
+  hooks:
+    bootstrap:
+      - service: db
+        run: psql -U app -d app -c "create table if not exists visits (at timestamptz default now())"
+        user: service
+    post-up:
+      - service: db
+        run: psql -U app -d app -qc "insert into visits default values"
+        user: service
+  overlays:
+    e2e: [compose.e2e.yml]
+  ports:
+    db: [5432]
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://app:app@db:5432/app
+  REDIS_URL: redis://cache:6379
+  MAILER_DSN: smtp://mail:1025
+
+services:
+  web:
+    image: nginx:1.29-alpine
+    ports: ["8080:80"]
+    volumes: ["./web:/usr/share/nginx/html:ro"]
+    depends_on:
+      api: {condition: service_healthy}
+
+  api:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "8000", "-h", "/www"]
+    ports: ["8000:8000"]
+    environment: *app-env
+    volumes: ["./api:/www:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/ready.json | grep -q ready"]
+      interval: 2s
+      retries: 30
+    depends_on:
+      db: {condition: service_healthy}
+      cache: {condition: service_healthy}
+
+  worker:
+    image: busybox:1.37
+    command: ["sh", "-c", "while true; do sleep 5; done"]
+    environment: *app-env
+    init: true
+
+  db:
+    image: postgres:17-alpine
+    environment: {POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app}
+    ports: ["5432"]
+    volumes: ["db_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "app"]
+      interval: 2s
+      retries: 30
+
+  cache:
+    image: redis:7-alpine
+    volumes: ["cache_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  mail:
+    image: axllent/mailpit:v1.27
+    ports: ["8025:8025"]
+
+  tools:
+    image: alpine:3.22
+    profiles: [tools]
+    command: ["sleep", "infinity"]
+    init: true
+    volumes: [".:/app"]
+    working_dir: /app
+
+volumes:
+  db_data:
+  cache_data:

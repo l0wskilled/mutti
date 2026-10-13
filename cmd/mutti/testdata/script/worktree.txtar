@@ -1,0 +1,42 @@
+# mutti worktree add creates a worktree next to the main one and starts it; remove destroys the
+# instance and the worktree, but never with uncommitted changes unless forced.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+cd shop
+
+exec mutti worktree add feature-x
+stdout '^Created .*/shop-feature-x \(branch feature-x\)\.$'
+stdout 'is up: https://feature-x\.'$MUTTI_TEST_RUN'\.localhost'
+exec git -C ../shop-feature-x branch --show-current
+stdout '^feature-x$'
+exec mutti list
+stdout '^'$MUTTI_TEST_RUN'-feature-x +running 1/1 +feature-x '
+
+cp ../wip.txt ../shop-feature-x/wip.txt
+! exec mutti worktree remove feature-x --yes
+stderr 'has uncommitted changes'
+exec mutti list
+stdout '^'$MUTTI_TEST_RUN'-feature-x +running'
+
+exec mutti worktree remove feature-x --yes --force
+stdout '^Removed .*/shop-feature-x\.$'
+! exists ../shop-feature-x
+exec mutti list
+! stdout 'feature-x'
+exec git branch --list feature-x
+stdout 'feature-x'
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+services:
+  web:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "80", "-h", "/"]
+    init: true
+    ports: ["8080:80"]
+-- wip.txt --
+not committed yet

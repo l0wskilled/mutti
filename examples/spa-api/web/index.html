@@ -1,0 +1,6 @@
+<!doctype html>
+<title>spa-api</title>
+<p id="msg">loading...</p>
+<script>
+  fetch("/api/hello.json").then((r) => r.json()).then((d) => (msg.textContent = d.message));
+</script>

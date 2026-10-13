@@ -1,0 +1,3 @@
+#!/bin/sh
+# Say hello with this worktree's URL, e.g. mutti greet Ada
+echo "Hello ${1:-there}, this worktree runs at https://$MUTTI_HOSTNAME"

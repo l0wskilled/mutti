@@ -1,0 +1,58 @@
+# The examples in examples/ do what their READMEs say.
+
+env R=$MUTTI_TEST_RUN
+env H=$MUTTI_HTTP_PORT
+
+# minimal: no configuration; a worktree runs next to it on its own hostname.
+example minimal
+cd $R-minimal
+exec mutti up
+stdout '^'$R'-minimal is up: https://'$R'-minimal.localhost'
+exec curl -sSf --resolve $R-minimal.localhost:$H:127.0.0.1 http://$R-minimal.localhost:$H/
+stdout 'hello from mutti'
+exec mutti worktree add feature
+stdout 'is up: https://feature.'$R'-minimal.localhost'
+exec curl -sSf --resolve feature.$R-minimal.localhost:$H:127.0.0.1 http://feature.$R-minimal.localhost:$H/
+stdout 'hello from mutti'
+exec mutti worktree remove feature --yes
+exec mutti destroy --yes
+cd $WORK
+
+# spa-api: the api on the app's own host under /api, and on a subdomain.
+example spa-api
+cd $R-spa-api
+exec mutti up
+exec curl -sSf --resolve $R-spa-api.localhost:$H:127.0.0.1 http://$R-spa-api.localhost:$H/
+stdout 'fetch\("/api/hello.json"\)'
+exec curl -sSf --resolve $R-spa-api.localhost:$H:127.0.0.1 http://$R-spa-api.localhost:$H/api/hello.json
+stdout 'hello from the api'
+exec curl -sSf --resolve api.$R-spa-api.localhost:$H:127.0.0.1 http://api.$R-spa-api.localhost:$H/api/hello.json
+stdout 'hello from the api'
+exec mutti destroy --yes
+cd $WORK
+
+# commands: a host command and a service command.
+example commands
+cd $R-commands
+exec mutti up
+exec mutti greet Ada
+stdout '^Hello Ada, this worktree runs at https://'$R'-commands.localhost$'
+exec mutti pages
+stdout '^index.html$'
+exec mutti destroy --yes
+cd $WORK
+
+# fullstack: hooks, routes without configuration, a fixed database port, tests in a throwaway copy.
+example fullstack
+cd $R-fullstack
+exec mutti up
+exec mutti exec db -u service -- psql -U app -tAc 'select count(*) from visits'
+stdout '^1$'
+exec mutti status
+stdout '^db .*5432='
+exec curl -sSf --resolve api.$R-fullstack.localhost:$H:127.0.0.1 http://api.$R-fullstack.localhost:$H/ready.json
+stdout ready
+exec curl -sSf --resolve mail.$R-fullstack.localhost:$H:127.0.0.1 http://mail.$R-fullstack.localhost:$H/
+exec mutti run --overlay e2e --service e2e-runner -- sh -c 'wget -qO- http://web/ && wget -qO- http://api:8000/ready.json'
+stdout ready
+exec mutti destroy --yes

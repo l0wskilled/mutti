@@ -1,0 +1,89 @@
+# mutti run: a fresh instance per run, the command's exit code, saved logs, parallel runs that
+# never meet, and nothing left behind, even when mutti is killed.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+mkdir shop/www
+cp index.html shop/www/index.html
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+cd shop
+
+# The command sees the run's id and URL; its exit code is mutti's.
+exitcode 7 mutti run -- sh -c 'curl -sf --resolve "$MUTTI_HOSTNAME:$MUTTI_HTTP_PORT:127.0.0.1" "http://$MUTTI_HOSTNAME:$MUTTI_HTTP_PORT/index.html"; echo "url=$MUTTI_URL"; exit 7'
+stdout '^hello$'
+stdout '^url=https://run-[0-9a-z]+-[0-9a-f]{8}\.'$MUTTI_TEST_RUN'\.localhost:'
+stderr 'exited with 7, logs in .*/\.mutti/local/runs/'
+exec sh -c 'cat .mutti/local/runs/*/services.log'
+stdout 'web-1 .*web started'
+exec git status --porcelain
+! stdout .
+
+# In a service: bootstrap ran in the fresh instance.
+exec mutti run --service db -- cat /data/booted
+stdout '^booted$'
+
+# mutti inside the command works on the run's instance: its data, not the worktree's own.
+exec mutti run -- sh -c 'mutti exec db -u service -- cat /data/booted && mutti compose ps --format "{{.Name}}"'
+stdout '^booted$'
+stdout '^'$MUTTI_TEST_RUN'-run-[0-9a-z]+-[0-9a-f]{8}-db-1$'
+! exec mutti run -- mutti up
+stderr 'mutti run [0-9a-z]+-[0-9a-f]{8} manages it'
+
+# Only some services: the others and their hooks stay out.
+exec mutti run --start web -- mutti compose ps --services
+stdout '^web$'
+! stdout '^db$'
+stderr 'skipping bootstrap hook 1: db is not running'
+
+# Two runs at once, each with its own data.
+exec mutti run --service db -u service -- sh -c 'echo first > /data/mine; sleep 3; cat /data/mine' &
+exec mutti run --service db -u service -- sh -c 'echo second > /data/mine; sleep 3; cat /data/mine' &
+wait
+stdout '^first$'
+stdout '^second$'
+
+exec sh -c 'docker ps -aq --filter name='$MUTTI_TEST_RUN'-run- | wc -l'
+stdout '^0$'
+
+# mutti interrupted: the command is asked to stop and gets time to clean up, then the run is removed.
+! exec mutti run -- sh -c 'trap "echo cleaned up; exit 7" TERM; touch started; sleep 60 & wait' &stopped&
+eventually 120 sh -c '[ -e started ]'
+kill -INT stopped
+wait stopped
+stdout '^cleaned up$'
+stderr 'run [0-9a-z]+-[0-9a-f]{8} exited with 7'
+eventually 60 sh -c '[ "$(docker ps -aq --filter name='$MUTTI_TEST_RUN'-run- | wc -l)" = 0 ]'
+
+# Killed with SIGKILL: the reaper removes containers and volumes, sweep what the router held.
+! exec mutti run -- sh -c 'kill -9 $PPID'
+eventually 60 sh -c '[ "$(docker ps -aq --filter name='$MUTTI_TEST_RUN'-run- | wc -l)" = 0 ]'
+eventually 30 sh -c '[ "$(docker volume ls -q --filter name='$MUTTI_TEST_RUN'-run- | wc -l)" = 0 ]'
+exec mutti sweep
+exec sh -c 'docker network ls -q --filter name='$MUTTI_TEST_RUN'-run- | wc -l'
+stdout '^0$'
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+  hooks:
+    bootstrap:
+      - service: db
+        run: echo booted > /data/booted
+        user: service
+services:
+  web:
+    image: busybox:1.37
+    command: ["sh", "-c", "echo web started; exec httpd -f -p 80 -h /www"]
+    init: true
+    ports: ["8080:80"]
+    volumes: ["./www:/www"]
+  db:
+    image: busybox:1.37
+    command: ["sleep", "infinity"]
+    init: true
+    volumes: ["data:/data"]
+volumes:
+  data:
+-- index.html --
+hello

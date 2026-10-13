@@ -1,0 +1,48 @@
+# Names belong to one worktree: a second clone with the same name is refused until renamed,
+# a moved worktree keeps its instance, and tidy cleans up after deleted worktrees.
+
+exec git init -q -b main a/shop
+cp compose.yml a/shop/compose.yml
+exec git -C a/shop add -A
+exec git -C a/shop commit -q -m init
+exec git clone -q a/shop b/shop
+
+exec mutti -C a/shop up
+! exec mutti -C b/shop up
+stderr 'already belongs to .*a/shop'
+stderr 'hint: give this worktree its own name: mutti rename <name>'
+exec mutti -C b/shop rename second
+stdout 'now '$MUTTI_TEST_RUN'-second'
+exec mutti -C b/shop up
+
+# git worktree move keeps the instance.
+exec git -C a/shop worktree add -q -b fix ../shop-fix
+exec mutti -C a/shop-fix up
+exec git -C a/shop worktree move ../shop-fix ../moved
+exec mutti -C a/moved up
+exec mutti list --json
+stdout '"name": "'$MUTTI_TEST_RUN'-fix"'
+stdout '"path": ".*a/moved"'
+
+# Deleting a worktree leaves an orphan that tidy removes.
+rm b/shop
+exec mutti list
+stdout '^'$MUTTI_TEST_RUN'-second +orphaned'
+exec mutti tidy --project $MUTTI_TEST_RUN
+stdout 'would remove '$MUTTI_TEST_RUN'-second'
+exec mutti tidy --project $MUTTI_TEST_RUN --yes
+stdout 'removed '$MUTTI_TEST_RUN'-second'
+exec mutti list
+! stdout 'second'
+
+exec mutti -C a/moved destroy --yes
+exec mutti -C a/shop destroy --yes
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+services:
+  app:
+    image: busybox:1.37
+    command: ["sleep", "infinity"]
+    init: true

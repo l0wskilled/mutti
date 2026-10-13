@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mutti</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="favicon.svg" alt="" width="28" height="28">
+        <span>mutti</span>
+      </div>
+
+      <nav class="nav" aria-label="Projects">
+        <div class="nav-label">Projects</div>
+        <ul id="projects"></ul>
+      </nav>
+
+      <section class="health" aria-label="System">
+        <div class="nav-label">System</div>
+        <ul id="checks" class="checks">
+          <li class="skeleton-line"></li>
+          <li class="skeleton-line"></li>
+          <li class="skeleton-line"></li>
+        </ul>
+      </section>
+
+      <div class="sidebar-foot">
+        <span id="conn" class="conn" role="status"><span class="conn-dot"></span><span class="conn-text">Connecting</span></span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="title">All instances</h1>
+          <p id="summary" class="summary">&nbsp;</p>
+        </div>
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search" type="search" placeholder="Search instances, branches, URLs" autocomplete="off" spellcheck="false">
+          <kbd>/</kbd>
+        </label>
+      </header>
+
+      <div id="grid" aria-live="polite">
+        <div class="cards">
+          <div class="card skeleton"></div>
+          <div class="card skeleton"></div>
+          <div class="card skeleton"></div>
+        </div>
+      </div>
+
+      <div id="empty" class="empty" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h6"/></svg>
+        <h2>No instances yet</h2>
+        <p>Run <code>mutti up</code> in a project with a Compose file, and it shows up here.</p>
+      </div>
+      <div id="nomatch" class="empty" hidden>
+        <h2>Nothing matches</h2>
+        <p>No instance matches your search.</p>
+      </div>
+    </main>
+
+    <aside id="drawer" class="drawer" aria-label="Instance" hidden>
+      <header class="drawer-head">
+        <div class="drawer-title">
+          <span id="d-dot" class="dot"></span>
+          <div>
+            <h2 id="d-name"></h2>
+            <p id="d-meta" class="muted"></p>
+          </div>
+        </div>
+        <button id="d-close" class="icon-btn" title="Close (Esc)" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div id="d-actions" class="drawer-actions"></div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="services" aria-selected="true">Services</button>
+        <button role="tab" data-tab="logs" aria-selected="false">Logs</button>
+        <button role="tab" data-tab="events" aria-selected="false">Events</button>
+      </div>
+      <section id="tab-services" class="tab-panel"></section>
+      <section id="tab-logs" class="tab-panel" hidden>
+        <div class="log-toolbar">
+          <select id="l-service" aria-label="Service"></select>
+          <input id="l-filter" type="search" placeholder="Filter lines" spellcheck="false">
+          <label class="toggle"><input id="l-follow" type="checkbox" checked><span>Follow</span></label>
+          <label class="toggle"><input id="l-wrap" type="checkbox" checked><span>Wrap</span></label>
+        </div>
+        <pre id="l-output" class="logs wrap"></pre>
+      </section>
+      <section id="tab-events" class="tab-panel" hidden>
+        <ol id="d-events" class="timeline"></ol>
+      </section>
+    </aside>
+  </div>
+
+  <dialog id="confirm" class="dialog">
+    <form method="dialog">
+      <h2 id="c-title"></h2>
+      <p id="c-text" class="muted"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" class="btn danger" id="c-ok"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" class="toasts" aria-live="assertive"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Errors tell what is wrong and what to do, in text and JSON.
+
+! exec mutti up
+stderr '^mutti: no Compose file here'
+stderr '^hint: '
+
+! exec mutti up --json
+stderr '"code": "no-compose-file"'
+
+mkdir broken
+cp bad.yml broken/compose.yml
+! exec mutti -C broken up
+stderr 'invalid x-mutti configuration: x-mutti: json: unknown field "mian"'
+
+exec mutti doctor
+stdout '^ok +docker'
+stdout '^ok +compose'
+stdout '^warn +project'
+
+-- bad.yml --
+x-mutti:
+  mian: web
+services:
+  web:
+    image: busybox:1.37

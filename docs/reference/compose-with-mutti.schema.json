@@ -1,0 +1,228 @@
+{
+  "$id": "https://github.com/l0wskilled/mutti/compose-with-mutti.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "$ref": "https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json"
+    },
+    {
+      "properties": {
+        "x-mutti": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/l0wskilled/mutti/x-mutti.schema.json",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The project's name, part of every hostname. Default: the main worktree's directory name."
+            },
+            "main": {
+              "type": "string",
+              "description": "The service behind the instance's main hostname. Default: the service publishing or\nexposing the most typical web port (80, 3000, 4200, 5173, 8000, 8080)."
+            },
+            "routes": {
+              "additionalProperties": {
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "description": "Subdomain under the main hostname; \"\" is the main hostname itself. Default: the service\nname, or \"\" for the main service."
+                  },
+                  "path": {
+                    "type": "string",
+                    "pattern": "^/[A-Za-z0-9._~/-]*$",
+                    "description": "Path prefix on the main hostname that also leads to the service, e.g. /api."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "Container port to send traffic to. Default: the service's first published TCP port, else\nits first exposed one."
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "description": "Route is how the router reaches one service."
+              },
+              "type": "object",
+              "description": "HTTP routes per service. Default: the main service on the main hostname, every other\nservice publishing or exposing an HTTP port on \u003cservice\u003e.\u003cmain hostname\u003e."
+            },
+            "ports": {
+              "additionalProperties": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": "object",
+              "description": "Container ports to publish on a fixed host port, per service, for tools that keep a\nconnection setting, such as database GUIs. The port follows from instance, service and\nport, so it stays the same across restarts."
+            },
+            "worktree": {
+              "properties": {
+                "copy": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "description": "Files and directories (globs allowed) that git does not track but a worktree needs, such\nas .env.local; copied from the main worktree into new ones, never overwriting."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "description": "Settings for mutti worktree add."
+            },
+            "exec": {
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "description": "\"host\" (default): the host user's uid:gid, so files in bind mounts belong to you;\n\"service\": the image's user; or an explicit user[:group]."
+                },
+                "home": {
+                  "type": "string",
+                  "description": "$HOME for commands run as the host user, who has no home in the image. Default /tmp."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "description": "How mutti exec, mutti shell and hooks run commands."
+            },
+            "hooks": {
+              "properties": {
+                "bootstrap": {
+                  "items": {
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "description": "Service to run the command in; it must be running."
+                      },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell command, run with sh -c inside the service."
+                      },
+                      "user": {
+                        "type": "string",
+                        "description": "Like exec.user; empty means exec.user."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "description": "Hook is one command."
+                  },
+                  "type": "array",
+                  "description": "Once per instance, after its first successful up."
+                },
+                "post-up": {
+                  "items": {
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "description": "Service to run the command in; it must be running."
+                      },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell command, run with sh -c inside the service."
+                      },
+                      "user": {
+                        "type": "string",
+                        "description": "Like exec.user; empty means exec.user."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "description": "Hook is one command."
+                  },
+                  "type": "array",
+                  "description": "After every up."
+                },
+                "pre-down": {
+                  "items": {
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "description": "Service to run the command in; it must be running."
+                      },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell command, run with sh -c inside the service."
+                      },
+                      "user": {
+                        "type": "string",
+                        "description": "Like exec.user; empty means exec.user."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "description": "Hook is one command."
+                  },
+                  "type": "array",
+                  "description": "Before down, destroy and reset; a failure is reported but does not stop the teardown."
+                },
+                "after-clone": {
+                  "items": {
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "description": "Service to run the command in; it must be running."
+                      },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell command, run with sh -c inside the service."
+                      },
+                      "user": {
+                        "type": "string",
+                        "description": "Like exec.user; empty means exec.user."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "description": "Hook is one command."
+                  },
+                  "type": "array",
+                  "description": "Instead of bootstrap when the data was copied from another instance\n(worktree add --data-from): the data needs no setup, the worktree may."
+                },
+                "sweep": {
+                  "items": {
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "description": "Service to run the command in; it must be running."
+                      },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell command, run with sh -c inside the service."
+                      },
+                      "user": {
+                        "type": "string",
+                        "description": "Like exec.user; empty means exec.user."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "description": "Hook is one command."
+                  },
+                  "type": "array",
+                  "description": "On mutti sweep, with MUTTI_SWEEP_OLDER_THAN in seconds: remove per-run resources the\nproject made inside services, such as test databases named after run ids."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "description": "Commands run inside services at points of an instance's life."
+            },
+            "overlays": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object",
+              "description": "Named sets of extra Compose files, enabled with --overlay \u003cname\u003e. Without --overlay, commands\nother than up and run use the overlays the instance was last started with."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "title": "x-mutti",
+          "description": "mutti's settings in a Compose file. Every key is optional."
+        }
+      }
+    }
+  ],
+  "description": "The Compose file schema plus mutti's x-mutti block.",
+  "title": "Compose file with x-mutti"
+}

@@ -1,0 +1,44 @@
+version: "2"
+
+run:
+  build-tags: [integration, e2e]
+
+linters:
+  enable:
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+  settings:
+    gosec:
+      excludes:
+        - G204 # subprocess with variable args: running git/docker is mutti's job, always via argv
+        - G304 # file inclusion via variable: paths come from the user's own project
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck]
+      - path: internal/cli/
+        linters: [contextcheck] # cobra hands the context over via cmd.Context()
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/l0wskilled/mutti

@@ -1,0 +1,36 @@
+# x-mutti.ports publishes a container port on a host port that stays the same across restarts,
+# so tools like database GUIs keep working.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+mkdir shop/srv
+cp hello.txt shop/srv/hello.txt
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+cd shop
+
+exec mutti up
+exec mutti compose port db 6000
+stdout '^127\.0\.0\.1:[2-5][0-9]{4}$'
+cp stdout ../port-before
+
+exec mutti down
+exec mutti up
+exec mutti compose port db 6000
+cmp stdout ../port-before
+
+exec mutti destroy --yes
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+  ports:
+    db: [6000]
+services:
+  db:
+    image: busybox:1.37
+    command: ["httpd", "-f", "-p", "6000", "-h", "/srv"]
+    init: true
+    volumes: ["./srv:/srv"]
+-- hello.txt --
+hello

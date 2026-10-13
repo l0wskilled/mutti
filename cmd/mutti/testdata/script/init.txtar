@@ -1,0 +1,72 @@
+# mutti init writes x-mutti into the Compose file without touching anything else, checks it with
+# docker compose first, writes AGENTS.md, and is a no-op the second time.
+
+exec git init -q -b main shop
+cp compose.yaml shop/compose.yaml
+cp compose.e2e.yaml shop/compose.e2e.yaml
+cd shop
+
+exec mutti init --dry-run
+stdout '^\+   main: web$'
+cmp compose.yaml ../compose.yaml
+
+exec mutti init --yes
+stdout '^Added x-mutti to .*/compose.yaml.$'
+cmp compose.yaml ../want.yaml
+exists AGENTS.md
+grep '^- Run a command in a service: `mutti exec <service> -- <command>`. Services: api, db, web.$' AGENTS.md
+! exec sh -c 'ls -a | grep -q mutti'
+
+exec mutti init --yes
+stdout '^Nothing to change'
+
+# The result is a working configuration: the overlay it found is usable.
+exec mutti compose --overlay e2e config --services
+stdout '^runner$'
+
+-- compose.yaml --
+# Our shop.
+
+services:
+  web:
+    image: busybox:1.37   # front door
+    ports: ["8080:80"]
+
+  api:
+    image: busybox:1.37
+    ports: ["3001:8000"]
+  db:
+    image: busybox:1.37
+    ports: ["5432:5432"]
+-- compose.e2e.yaml --
+services:
+  runner:
+    image: busybox:1.37
+-- want.yaml --
+# Our shop.
+
+# mutti: every key is optional.
+# Reference: https://github.com/l0wskilled/mutti/blob/main/docs/reference/x-mutti.md
+x-mutti:
+  main: web
+  # HTTP routes mutti sets up now; listing routes replaces these defaults:
+  # routes:
+  #   api: { port: 8000 }
+  #   web: { port: 80 }
+  # A fixed host port per worktree, for database tools (default: a random one):
+  # ports:
+  #   db: [5432]
+  overlays:
+    e2e: [compose.e2e.yaml]
+
+services:
+  web:
+    image: busybox:1.37   # front door
+    ports: ["8080:80"]
+
+  api:
+    image: busybox:1.37
+    ports: ["3001:8000"]
+  db:
+    image: busybox:1.37
+    ports: ["5432:5432"]

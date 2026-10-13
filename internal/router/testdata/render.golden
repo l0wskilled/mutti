@@ -1,0 +1,74 @@
+{
+  "http": {
+    "routers": {
+      "mutti__ready": {
+        "rule": "Host(`mutti-ready.internal`) && Path(`/.well-known/mutti/605095f31883`)",
+        "service": "ping@internal",
+        "entryPoints": [
+          "web"
+        ]
+      },
+      "shop-feature__api__http": {
+        "rule": "Host(`api.feature.shop.localhost`) || (Host(`feature.shop.localhost`) && PathPrefix(`/api`))",
+        "service": "shop-feature__api",
+        "entryPoints": [
+          "web"
+        ]
+      },
+      "shop-feature__api__https": {
+        "rule": "Host(`api.feature.shop.localhost`) || (Host(`feature.shop.localhost`) && PathPrefix(`/api`))",
+        "service": "shop-feature__api",
+        "entryPoints": [
+          "websecure"
+        ],
+        "tls": {}
+      },
+      "shop-feature__web__http": {
+        "rule": "Host(`feature.shop.localhost`)",
+        "service": "shop-feature__web",
+        "entryPoints": [
+          "web"
+        ]
+      },
+      "shop-feature__web__https": {
+        "rule": "Host(`feature.shop.localhost`)",
+        "service": "shop-feature__web",
+        "entryPoints": [
+          "websecure"
+        ],
+        "tls": {}
+      }
+    },
+    "services": {
+      "shop-feature__api": {
+        "loadBalancer": {
+          "servers": [
+            {
+              "url": "http://shop-feature-api-1:8000"
+            }
+          ]
+        }
+      },
+      "shop-feature__web": {
+        "loadBalancer": {
+          "servers": [
+            {
+              "url": "http://shop-feature-web-1:80"
+            },
+            {
+              "url": "http://shop-feature-web-2:80"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tls": {
+    "certificates": [
+      {
+        "certFile": "CERT feature",
+        "keyFile": "KEY feature"
+      }
+    ]
+  }
+}

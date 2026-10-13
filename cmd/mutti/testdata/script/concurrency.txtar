@@ -1,0 +1,46 @@
+# Five worktrees start at once while no router exists yet: all come up, they get one router,
+# and each instance is reachable under its own name.
+
+exec git init -q -b main shop
+cp compose.yml shop/compose.yml
+exec git -C shop add -A
+exec git -C shop commit -q -m init
+exec git -C shop worktree add -q -b a ../shop-a
+exec git -C shop worktree add -q -b b ../shop-b
+exec git -C shop worktree add -q -b c ../shop-c
+exec git -C shop worktree add -q -b d ../shop-d
+
+exec mutti -C shop up &
+exec mutti -C shop-a up &
+exec mutti -C shop-b up &
+exec mutti -C shop-c up &
+exec mutti -C shop-d up &
+wait
+
+exec sh -c 'docker ps -q --filter name=^/'$MUTTI_ROUTER_NAME'$ | wc -l'
+stdout '^1$'
+exec mutti router status
+stdout 'routing 5 instance'
+exec curl -sf --resolve c.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://c.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/
+stdout 'shop-c'
+
+exec mutti -C shop destroy --yes &
+exec mutti -C shop-a destroy --yes &
+exec mutti -C shop-b destroy --yes &
+exec mutti -C shop-c destroy --yes &
+exec mutti -C shop-d destroy --yes &
+wait
+exec mutti router status
+stdout 'routing 0 instance'
+
+-- compose.yml --
+x-mutti:
+  name: ${MUTTI_TEST_RUN:?}
+services:
+  web:
+    image: busybox:1.37
+    command: ["sh", "-c", "mkdir -p /www && echo $$MUTTI_WORKTREE_DIR > /www/index.html && exec httpd -f -p 80 -h /www"]
+    environment:
+      MUTTI_WORKTREE_DIR: ${MUTTI_HOST_PATH}
+    init: true
+    ports: ["8080:80"]
