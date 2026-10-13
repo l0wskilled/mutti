@@ -40,6 +40,13 @@ Once per machine, let your system and browsers trust mutti's local certificate a
 $ mutti trust
 ```
 
+## Versioning
+
+mutti follows [Semantic Versioning](https://semver.org). Before 1.0, a minor release (0.2 to
+0.3) may break things and a patch release only fixes them. From 1.0 on, only a major release
+changes the command line, the `--json` output or the `x-mutti` configuration in incompatible
+ways, and instances made by an older mutti keep working with a newer one.
+
 ## Quick start
 
 In any directory with a `compose.yaml`:
@@ -199,3 +206,6 @@ $ make cover       # unit + integration tests against Docker, 100% coverage requ
 $ make test-e2e    # end-to-end tests with the real binary
 $ make docs        # regenerate docs/reference
 ```
+
+A release is a tag `vX.Y.Z` on `main`: the release workflow runs all checks, builds the archives
+and publishes them with their changelog.
