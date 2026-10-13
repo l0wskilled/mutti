@@ -31,11 +31,12 @@ stdout '^pong$'
 exec curl -sSf --resolve $MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/api/ping.txt
 stdout '^pong$'
 
-# Inside an instance its own hostnames reach the router; the other instance's do not resolve.
+# Inside an instance its own hostnames reach the router; the other instance's do not. Whether
+# they fail to resolve or resolve to the container itself (RFC 6761 resolvers) depends on the host.
 exec mutti -C shop exec web -- wget -qO- http://api.$MUTTI_TEST_RUN.localhost/api/ping.txt
 stdout '^pong$'
 ! exec mutti -C shop exec web -- wget -T 3 -qO- http://api.feature.$MUTTI_TEST_RUN.localhost/api/ping.txt
-stderr 'bad address'
+! stdout pong
 ! exec mutti -C shop exec web -- nslookup $MUTTI_TEST_RUN-feature-api-1
 stdout 'NXDOMAIN|can.t find'
 
