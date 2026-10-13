@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/l0wskilled/mutti/internal/compose"
@@ -250,32 +251,23 @@ func TestPrompt(t *testing.T) {
 	}
 }
 
-func TestStatusLeavesOutIdleProfiledServices(t *testing.T) {
+func TestStatusListsOptionalServicesLast(t *testing.T) {
 	root := newRepo(t, "shop")
 	h := newHarness(t, &compose.Model{Services: map[string]compose.Service{
-		"web": {}, "db": {}, "tool": {Profiles: []string{"tools"}},
+		"web": {}, "db": {}, "tool": {Profiles: []string{"tools"}}, "admin": {Profiles: []string{"tools"}},
 	}})
-	names := func() []string {
-		st, err := h.app.Status(ctx, root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var out []string
-		for _, s := range st.Services {
-			out = append(out, s.Service)
-		}
-		return out
-	}
 	if _, err := h.app.Up(ctx, root, UpOptions{Services: []string{"web"}}); err != nil {
 		t.Fatal(err)
 	}
-	if got := names(); !slices.Equal(got, []string{"db", "web"}) {
-		t.Errorf("idle tool shown: %v", got)
-	}
-	if _, err := h.app.Up(ctx, root, UpOptions{Services: []string{"tool"}}); err != nil {
+	st, err := h.app.Status(ctx, root)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got := names(); !slices.Equal(got, []string{"db", "tool", "web"}) {
-		t.Errorf("running tool hidden: %v", got)
+	var got []string
+	for _, s := range st.Services {
+		got = append(got, s.Service+":"+s.State+":"+strings.Join(s.Profiles, ","))
+	}
+	if want := []string{"db:missing:", "web:running:", "admin:missing:tools", "tool:missing:tools"}; !slices.Equal(got, want) {
+		t.Errorf("services %v, want %v", got, want)
 	}
 }

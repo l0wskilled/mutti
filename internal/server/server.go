@@ -224,7 +224,8 @@ func (s *Server) lifecycle(action string) http.HandlerFunc {
 		switch action {
 		case "up":
 			var res *app.UpResult
-			if res, err = a.Up(r.Context(), dir, app.UpOptions{}); err == nil {
+			// ?service= (repeatable) starts only those services, an optional one among them.
+			if res, err = a.Up(r.Context(), dir, app.UpOptions{Services: r.URL.Query()["service"]}); err == nil {
 				done.Instance, done.URL = res.Instance.Name, res.URL
 			}
 		case "stop":

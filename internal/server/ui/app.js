@@ -316,6 +316,7 @@ function selectTab(tab) {
 }
 
 function badgeOf(svc) {
+  if (svc.profiles && svc.state !== "running") return ["off", "off"];
   if (svc.state === "missing") return ["missing", "not created"];
   if (/\(healthy\)/.test(svc.status)) return ["healthy", "healthy"];
   if (/\(unhealthy\)/.test(svc.status)) return ["unhealthy", "unhealthy"];
@@ -334,6 +335,57 @@ function row(label, valueNode, copyText) {
   );
 }
 
+function serviceCard(s, svc) {
+  const [kind, label] = badgeOf(svc);
+  const rows = [];
+  for (const u of svc.urls || []) rows.push(row("URL", el("a", { href: u, target: "_blank", rel: "noopener", text: u }), u));
+  for (const p of svc.ports || []) rows.push(row(`:${p.containerPort}`, el("code", { text: p.address }), p.address));
+  if (svc.state === "running") rows.push(row("shell", el("code", { text: `mutti shell ${svc.service}` }), `mutti -C ${s.path} shell ${svc.service}`));
+  return el(
+    "div",
+    { class: "svc" },
+    el(
+      "div",
+      { class: "svc-head" },
+      el("strong", { text: svc.service }),
+      el("span", { class: `badge ${kind}`, text: label }),
+      el("span", { class: "svc-status", text: svc.status }),
+      svc.profiles && svc.state !== "running" ? startButton(s, "service:" + svc.service, [svc.service]) : null,
+    ),
+    rows.length ? el("div", { class: "svc-rows" }, ...rows) : null,
+  );
+}
+
+function profileHead(s, profile, services) {
+  const idle = services.filter((svc) => svc.state !== "running").map((svc) => svc.service);
+  return el(
+    "div",
+    { class: "profile-head" },
+    el("div", {}, el("strong", { text: profile }), el("span", { class: "muted", text: "Optional, runs when started" })),
+    idle.length > 1 ? startButton(s, "profile:" + profile, idle, "Start all") : null,
+  );
+}
+
+// startButton starts the given optional services; key tells this button's work from others'.
+function startButton(s, key, services, text = "Start") {
+  const busy = state.busy.get(s.path) === key;
+  return el("button", { class: "btn sm", disabled: busy, onclick: () => startServices(s, key, services) }, iconSpan("play"), el("span", { text: busy ? "Starting" : text }));
+}
+
+async function startServices(s, key, services) {
+  state.busy.set(s.path, key);
+  loadServices();
+  try {
+    await api(`/api/up?dir=${q(s.path)}${services.map((x) => "&service=" + q(x)).join("")}`, { method: "POST" });
+    toast("ok", `${services.join(", ")} started`);
+  } catch (err) {
+    toast("error", `Could not start ${services.join(", ")}`, err);
+  }
+  state.busy.delete(s.path);
+  await loadInstances();
+  if (state.selected === s.path && state.tab === "services") loadServices();
+}
+
 async function loadServices() {
   const s = selectedInstance();
   const panel = $("tab-services");
@@ -346,23 +398,22 @@ async function loadServices() {
     panel.replaceChildren(el("p", { class: "muted", text: err.message + (err.hint ? "\n→ " + err.hint : "") }));
     return;
   }
+  // The services every start brings up first, then one group per profile (the first one of a
+  // service) with a button that starts the services of that group.
+  const groups = new Map();
+  for (const svc of st.services) {
+    const profile = (svc.profiles || [])[0] || "";
+    if (!groups.has(profile)) groups.set(profile, []);
+    groups.get(profile).push(svc);
+  }
   panel.replaceChildren(
-    el(
-      "div",
-      { class: "services" },
-      ...st.services.map((svc) => {
-        const [kind, label] = badgeOf(svc);
-        const rows = [];
-        for (const u of svc.urls || []) rows.push(row("URL", el("a", { href: u, target: "_blank", rel: "noopener", text: u }), u));
-        for (const p of svc.ports || []) rows.push(row(`:${p.containerPort}`, el("code", { text: p.address }), p.address));
-        if (svc.state === "running") rows.push(row("shell", el("code", { text: `mutti shell ${svc.service}` }), `mutti -C ${s.path} shell ${svc.service}`));
-        return el(
-          "div",
-          { class: "svc" },
-          el("div", { class: "svc-head" }, el("strong", { text: svc.service }), el("span", { class: `badge ${kind}`, text: label }), el("span", { class: "svc-status", text: svc.status })),
-          rows.length ? el("div", { class: "svc-rows" }, ...rows) : null,
-        );
-      }),
+    ...[...groups].map(([profile, services]) =>
+      el(
+        "div",
+        { class: "svc-group" },
+        profile ? profileHead(s, profile, services) : null,
+        el("div", { class: "services" }, ...services.map((svc) => serviceCard(s, svc))),
+      ),
     ),
   );
   const select = $("l-service");

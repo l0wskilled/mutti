@@ -84,11 +84,13 @@ func (a *App) Shell(ctx context.Context, dir, service string, opts ExecOptions) 
 
 // ServiceStatus is one service in Status.
 type ServiceStatus struct {
-	Service string        `json:"service"`
-	State   string        `json:"state"`  // running, exited, ... or "missing" when not created
-	Status  string        `json:"status"` // Docker's text, e.g. "Up 3 minutes (healthy)"
-	URLs    []string      `json:"urls,omitempty"`
-	Ports   []PortSummary `json:"ports,omitempty"`
+	Service string `json:"service"`
+	State   string `json:"state"`  // running, exited, ... or "missing" when not created
+	Status  string `json:"status"` // Docker's text, e.g. "Up 3 minutes (healthy)"
+	// Profiles are the Compose profiles of an optional service, which runs only when asked for.
+	Profiles []string      `json:"profiles,omitempty"`
+	URLs     []string      `json:"urls,omitempty"`
+	Ports    []PortSummary `json:"ports,omitempty"`
 }
 
 // InstanceStatus is the detailed state of one worktree's instance.
@@ -128,7 +130,7 @@ func (a *App) Status(ctx context.Context, dir string) (*InstanceStatus, error) {
 	}
 	byService := map[string]*ServiceStatus{}
 	for _, name := range inst.Model.ServiceNames() {
-		ss := &ServiceStatus{Service: name, State: "missing"}
+		ss := &ServiceStatus{Service: name, State: "missing", Profiles: inst.Model.Services[name].Profiles}
 		for _, h := range routes[name].Hosts {
 			ss.URLs = append(ss.URLs, hostURL(h, s.HTTPSPort))
 		}
@@ -146,12 +148,13 @@ func (a *App) Status(ctx context.Context, dir string) (*InstanceStatus, error) {
 	}
 	for _, name := range inst.Model.ServiceNames() {
 		ss := byService[name]
-		if ss.State == "missing" && len(inst.Model.Services[name].Profiles) > 0 {
-			continue // started on demand, not part of the instance until then
-		}
 		slices.SortFunc(ss.Ports, func(x, y PortSummary) int { return cmp.Compare(x.ContainerPort, y.ContainerPort) })
 		st.Services = append(st.Services, *ss)
 	}
+	// The services every up starts come first, then the optional ones by profile.
+	slices.SortStableFunc(st.Services, func(x, y ServiceStatus) int {
+		return cmp.Compare(strings.Join(x.Profiles, ","), strings.Join(y.Profiles, ","))
+	})
 	return st, nil
 }
 

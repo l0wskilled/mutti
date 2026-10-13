@@ -242,6 +242,8 @@ a:hover { text-decoration: underline; }
 .btn.danger:hover { background: var(--red-soft); border-color: var(--red); }
 .dialog .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
 .btn svg { width: 0.95rem; height: 0.95rem; }
+.btn.sm { height: 1.7rem; padding: 0 0.6rem; font-size: 0.8rem; }
+.svc-head .btn.sm { margin-left: 0.5rem; }
 
 .icon-btn { display: grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
@@ -279,6 +281,10 @@ a:hover { text-decoration: underline; }
 #tab-logs:not([hidden]) { display: flex; flex-direction: column; gap: 0.75rem; overflow: hidden; }
 
 .services { display: flex; flex-direction: column; gap: 0.6rem; }
+.svc-group + .svc-group { margin-top: 1.4rem; }
+.profile-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.6rem; }
+.profile-head strong { font-size: 0.9rem; margin-right: 0.5rem; }
+.profile-head .muted { font-size: 0.8rem; }
 .svc { padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .svc-head { display: flex; align-items: center; gap: 0.6rem; }
 .svc-head strong { font-size: 0.95rem; }

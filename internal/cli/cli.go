@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -943,16 +944,27 @@ func statusCmd(d *Deps, p *printer) *cobra.Command {
 					fmt.Fprintf(w, "%s\n", st.URL)
 				}
 				fmt.Fprintln(w)
+				// A profile column only for projects that have optional services.
+				optional := slices.ContainsFunc(st.Services, func(s app.ServiceStatus) bool { return len(s.Profiles) > 0 })
 				tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+				if optional {
+					fmt.Fprint(tw, "PROFILE\t")
+				}
 				fmt.Fprintln(tw, "SERVICE\tSTATE\tURL\tPORTS")
 				for _, s := range st.Services {
 					state := s.State
-					if s.Status != "" {
+					switch {
+					case s.Status != "":
 						state = s.Status
+					case len(s.Profiles) > 0:
+						state = "off"
 					}
 					var ports []string
 					for _, port := range s.Ports {
 						ports = append(ports, fmt.Sprintf("%d=%s", port.ContainerPort, port.Address))
+					}
+					if optional {
+						fmt.Fprintf(tw, "%s\t", strings.Join(s.Profiles, ","))
 					}
 					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", s.Service, state, strings.Join(s.URLs, " "), strings.Join(ports, " "))
 				}

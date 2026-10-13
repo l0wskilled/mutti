@@ -1110,3 +1110,15 @@ func TestServe(t *testing.T) {
 		t.Errorf("exit %d, stderr %q", code, errOut.String())
 	}
 }
+
+func TestStatusShowsProfiles(t *testing.T) {
+	w := newWorld(t)
+	w.compose.ConfigFn = func(compose.Spec) (*compose.Model, error) {
+		return &compose.Model{Services: map[string]compose.Service{"web": {}, "report": {Profiles: []string{"tools"}}}}, nil
+	}
+	w.mustRun("up")
+	out := w.mustRun("status")
+	if !strings.Contains(out, "PROFILE  SERVICE  STATE") || !strings.Contains(out, "\n         web      Up 1 second") || !strings.Contains(out, "\ntools    report   off") {
+		t.Errorf("status: %q", out)
+	}
+}

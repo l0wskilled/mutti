@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,9 @@ func TestAPI(t *testing.T) {
 	if code != http.StatusOK || up.Instance != "shop" || up.URL != "https://shop.localhost" {
 		t.Fatalf("up: %d %+v", code, up)
 	}
+	if code, _, _ := call[Done](t, http.MethodPost, ts.URL+"/api/up"+dir+"&service=web"); code != http.StatusOK || !slices.Contains(lastUp(w), "web") {
+		t.Fatalf("up of one service: %d %v", code, lastUp(w))
+	}
 	if _, list, _ := call[[]app.Summary](t, http.MethodGet, ts.URL+"/api/instances"); len(list) != 1 || list[0].Status != app.StatusRunning {
 		t.Fatalf("instances %+v", list)
 	}
@@ -92,6 +96,16 @@ func TestAPI(t *testing.T) {
 	if !strings.Contains(string(page), `<script src="app.js">`) {
 		t.Errorf("ui %q", page)
 	}
+}
+
+// lastUp returns the arguments of the last docker compose up.
+func lastUp(w *apptest.World) []string {
+	for i := len(w.Compose.Runs) - 1; i >= 0; i-- {
+		if w.Compose.Runs[i][0] == "up" {
+			return w.Compose.Runs[i]
+		}
+	}
+	return nil
 }
 
 func TestAPIErrors(t *testing.T) {

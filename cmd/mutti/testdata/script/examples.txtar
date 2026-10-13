@@ -49,7 +49,7 @@ exec mutti up
 exec mutti exec db -u service -- psql -U app -tAc 'select count(*) from visits'
 stdout '^1$'
 exec mutti status
-stdout '^db .*5432='
+stdout '^ *db .*5432='
 exec curl -sSf --resolve api.$R-fullstack.localhost:$H:127.0.0.1 http://api.$R-fullstack.localhost:$H/ready.json
 stdout ready
 exec curl -sSf --resolve mail.$R-fullstack.localhost:$H:127.0.0.1 http://mail.$R-fullstack.localhost:$H/
