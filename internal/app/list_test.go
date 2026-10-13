@@ -463,3 +463,22 @@ func TestLegacyClaimsGetTheirOriginAndShowTheirBranch(t *testing.T) {
 		t.Error("up did not write the origin")
 	}
 }
+
+func TestOptionalServicesCountOnlyWhileTheyRun(t *testing.T) {
+	root := newRepo(t, "shop")
+	h := newHarness(t, &compose.Model{Services: map[string]compose.Service{"web": {}, "tool": {Profiles: []string{"tools"}}}})
+	if _, err := h.app.Up(ctx, root, UpOptions{Selection: Selection{Profiles: []string{"tools"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if s := summaryOf(t, h, "shop"); s.Running != 2 || s.Total != 2 {
+		t.Fatalf("tool running: %+v", s)
+	}
+	cs, _ := h.eng.ListContainers(ctx, engine.LabelComposeService+"=tool")
+	if cs[0].Labels[LabelOptional] != "true" {
+		t.Fatalf("tool labels %v", cs[0].Labels)
+	}
+	h.eng.SetContainerState(cs[0].ID, "exited")
+	if s := summaryOf(t, h, "shop"); s.Status != StatusRunning || s.Running != 1 || s.Total != 1 {
+		t.Fatalf("tool stopped: %+v", s)
+	}
+}

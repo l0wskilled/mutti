@@ -92,7 +92,7 @@ func (a *App) summarize(ctx context.Context, httpsPort uint16, claim engine.Volu
 
 	urls := map[string]bool{}
 	main := ""
-	done := completed(containers)
+	done := settled(containers)
 	for _, c := range containers {
 		if !done[c.ID] {
 			s.Total++
@@ -278,10 +278,14 @@ func volumeNames(vs []engine.Volume) []string {
 // labelDependsOn is where Compose notes a container's depends_on: service:condition:restart, ...
 const labelDependsOn = "com.docker.compose.depends_on"
 
-// completed returns the ids of containers of one-shot services that did their job: services
-// another one waits for with service_completed_successfully, exited with 0. They count neither
-// as running nor as missing; a stopped service that others merely start after stays stopped.
-func completed(containers []engine.Container) map[string]bool {
+// LabelOptional marks a service behind a Compose profile, which only runs when asked for.
+const LabelOptional = "mutti.optional"
+
+// settled returns the ids of containers that count neither as running nor as missing: one-shot
+// services that did their job (another service waits for them with
+// service_completed_successfully, and they exited with 0), and optional services that do not
+// run. A stopped service that others merely start after stays stopped.
+func settled(containers []engine.Container) map[string]bool {
 	oneShot := map[string]bool{}
 	for _, c := range containers {
 		for dep := range strings.SplitSeq(c.Labels[labelDependsOn], ",") {
@@ -292,7 +296,8 @@ func completed(containers []engine.Container) map[string]bool {
 	}
 	done := map[string]bool{}
 	for _, c := range containers {
-		if oneShot[c.Labels[engine.LabelComposeService]] && c.State == "exited" && strings.HasPrefix(c.Status, "Exited (0)") {
+		oneShotDone := oneShot[c.Labels[engine.LabelComposeService]] && c.State == "exited" && strings.HasPrefix(c.Status, "Exited (0)")
+		if oneShotDone || c.Labels[LabelOptional] == "true" && c.State != "running" {
 			done[c.ID] = true
 		}
 	}

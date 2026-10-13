@@ -217,7 +217,7 @@ func (a *App) Prompt(ctx context.Context, dir string) string {
 			return ""
 		}
 		s := Summary{}
-		done := completed(containers)
+		done := settled(containers)
 		for _, ct := range containers {
 			if !done[ct.ID] {
 				s.Total++

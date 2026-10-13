@@ -70,6 +70,14 @@ func (a *App) prepare(ctx context.Context, inst *Instance, sel Selection) (compo
 		return compose.Spec{}, err
 	}
 	common, perService := routeLabels(inst, m, rs.Name)
+	for name, svc := range m.Services {
+		if len(svc.Profiles) > 0 {
+			if perService[name] == nil {
+				perService[name] = map[string]string{}
+			}
+			perService[name][LabelOptional] = "true"
+		}
+	}
 	fixed, err := a.fixedPorts(ctx, inst)
 	if err != nil {
 		return compose.Spec{}, err
