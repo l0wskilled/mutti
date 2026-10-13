@@ -11,7 +11,7 @@ check: fmt docs-check
 
 ## fmt: fail if any file is not formatted
 fmt:
-	@out=$$($(TOOLS) golangci-lint fmt --diff ./... 2>&1); if [ -n "$$out" ]; then echo "$$out"; exit 1; fi
+	@out=$$($(TOOLS) golangci-lint fmt --diff ./...) || { echo "$$out"; exit 1; }; if [ -n "$$out" ]; then echo "$$out"; exit 1; fi
 
 ## docs: regenerate docs/reference from the code (CLI reference, x-mutti reference and schemas)
 docs:

@@ -4,8 +4,10 @@ package engine_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/netip"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -18,13 +20,31 @@ import (
 	"github.com/l0wskilled/mutti/internal/engine/enginetest"
 )
 
+// testImage is what the tests create containers from.
+const testImage = "busybox:1.37"
+
+// TestMain pulls testImage, which a fresh machine does not have.
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	e, err := engine.Connect(ctx)
+	if err == nil {
+		err = e.PullImage(ctx, testImage)
+		_ = e.Close()
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "pull %s: %v\n", testImage, err)
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
 type mobySeeder struct{ c *client.Client }
 
 func (s mobySeeder) SeedContainer(t *testing.T, labels map[string]string) string {
 	t.Helper()
 	ctx := context.Background()
 	res, err := s.c.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Config: &container.Config{Image: "busybox:1.37", Labels: labels},
+		Config: &container.Config{Image: testImage, Labels: labels},
 	})
 	if err != nil {
 		t.Fatalf("seed container: %v", err)
@@ -40,7 +60,7 @@ func (s mobySeeder) SeedPublished(t *testing.T, labels map[string]string) string
 	ctx := context.Background()
 	res, err := s.c.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
-			Image:        "busybox:1.37",
+			Image:        testImage,
 			Cmd:          []string{"sleep", "300"},
 			Labels:       labels,
 			ExposedPorts: network.PortSet{network.MustParsePort("80/tcp"): {}, network.MustParsePort("81/tcp"): {}},
@@ -124,12 +144,12 @@ func TestMobyRunContainerFailures(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = e.Close() })
 
-	if _, err := e.RunContainer(context.Background(), engine.ContainerSpec{Image: "busybox:1.37", Cmd: []string{"/no/such/binary"}}); err == nil {
+	if _, err := e.RunContainer(context.Background(), engine.ContainerSpec{Image: testImage, Cmd: []string{"/no/such/binary"}}); err == nil {
 		t.Error("start failure: want error")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	if _, err := e.RunContainer(ctx, engine.ContainerSpec{Image: "busybox:1.37", Cmd: []string{"sleep", "30"}}); err == nil {
+	if _, err := e.RunContainer(ctx, engine.ContainerSpec{Image: testImage, Cmd: []string{"sleep", "30"}}); err == nil {
 		t.Error("cancelled wait: want error")
 	}
 }
@@ -148,7 +168,7 @@ func TestMobyFixedHostPort(t *testing.T) {
 	port := uint16(l.Addr().(*net.TCPAddr).Port)
 	_ = l.Close()
 	id, err := e.CreateContainer(ctx, engine.ContainerSpec{
-		Image: "busybox:1.37", Cmd: []string{"sleep", "30"}, Labels: map[string]string{"mutti.test.fixed": "1"},
+		Image: testImage, Cmd: []string{"sleep", "30"}, Labels: map[string]string{"mutti.test.fixed": "1"},
 		Ports: []engine.Port{{HostIP: "127.0.0.1", HostPort: port, ContainerPort: 80, Proto: "tcp"}},
 	})
 	if err != nil {
