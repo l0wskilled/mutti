@@ -953,7 +953,7 @@ func TestMCPServesOverTheCommandsStreams(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"down", "exec", "list", "logs", "restart", "run", "status", "stop", "up", "url", "worktree_add"}) {
+	if !slices.Equal(names, []string{"diagnose", "down", "exec", "list", "logs", "restart", "run", "status", "stop", "up", "url", "worktree_add"}) {
 		t.Errorf("tools %v", names)
 	}
 	if got := session.InitializeResult(); got != nil && got.ServerInfo.Version != "1.2.3" {
@@ -1132,5 +1132,49 @@ func TestStatusShowsProfiles(t *testing.T) {
 	out := w.mustRun("status")
 	if !strings.Contains(out, "PROFILE  SERVICE  STATE") || !strings.Contains(out, "\n         web      Up 1 second") || !strings.Contains(out, "\ntools    report   off") {
 		t.Errorf("status: %q", out)
+	}
+}
+
+func TestDiagnoseAndStatusExplainTrouble(t *testing.T) {
+	w := newWorld(t)
+	w.mustRun("up")
+	if out := w.mustRun("diagnose"); out != "All services are well.\n" {
+		t.Errorf("well: %q", out)
+	}
+	w.compose.Stdout = func(args []string) string {
+		if args[0] == "logs" {
+			return strings.Repeat("line\n", 12) + "panic: no database\n"
+		}
+		return ""
+	}
+	id := w.eng.AddContainer(engine.Container{State: "running", Status: "Up 1 minute (unhealthy)", Labels: map[string]string{engine.LabelComposeProject: "shop", engine.LabelComposeService: "web"}})
+	w.eng.SetRuntime(id, engine.Runtime{Health: []engine.HealthProbe{{Start: time.Unix(0, 0), ExitCode: 1, Output: "curl: (7) refused\n"}}})
+
+	out := w.mustRun("status")
+	if !strings.Contains(out, "! web: unhealthy: its health check exits with 1\n  -> ") || !strings.Contains(out, "exit 1):\n    curl: (7) refused\n  last logs:\n") ||
+		strings.Count(out, "    line\n") != 7 || !strings.HasSuffix(out, "    panic: no database\n\nMore: mutti diagnose\n") {
+		t.Errorf("status: %q", out)
+	}
+	if out := w.mustRun("diagnose", "web"); strings.Count(out, "    line\n") != 24 { // both web containers, all lines
+		t.Errorf("diagnose: %q", out)
+	}
+	if code, _, _ := w.run(w.root, "diagnose", "--json"); code != 0 {
+		t.Errorf("json: %d", code)
+	}
+	if code, _, _ := w.run(t.TempDir(), "diagnose"); code != ExitError {
+		t.Errorf("outside: %d", code)
+	}
+}
+
+func TestFailedUpExplainsWhatIsWrong(t *testing.T) {
+	w := newWorld(t)
+	w.mustRun("up")
+	id := w.eng.AddContainer(engine.Container{State: "exited", Status: "Exited (127) 1 second ago", Labels: map[string]string{engine.LabelComposeProject: "shop", engine.LabelComposeService: "web"}})
+	w.eng.SetRuntime(id, engine.Runtime{ExitCode: 127})
+	w.compose.Exit = func(args []string) int { return map[string]int{"up": 1, "restart": 1}[args[0]] }
+	for _, cmd := range []string{"up", "restart"} {
+		if code, _, stderr := w.run(w.root, cmd); code == 0 || !strings.Contains(stderr, "! web: exited with 127: the command was not found") {
+			t.Errorf("%s: %d %q", cmd, code, stderr)
+		}
 	}
 }

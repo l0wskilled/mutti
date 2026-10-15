@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", http.FileServerFS(static))
 	mux.HandleFunc("GET /api/instances", s.instances)
 	mux.HandleFunc("GET /api/status", s.status)
+	mux.HandleFunc("GET /api/diagnose", s.diagnose)
 	mux.HandleFunc("GET /api/logs", s.logs)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/doctor", s.doctor)
@@ -171,6 +172,22 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reply(w, st)
+}
+
+// diagnose explains the services that are not well, or those named with ?service=.
+func (s *Server) diagnose(w http.ResponseWriter, r *http.Request) {
+	dir, err := worktree(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	a, _ := s.call()
+	diags, err := a.Diagnose(r.Context(), dir, r.URL.Query()["service"]...)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, diags)
 }
 
 // doctor checks Docker, Compose, the router, HTTPS and the project mutti serve runs in.

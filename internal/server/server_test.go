@@ -70,6 +70,9 @@ func TestAPI(t *testing.T) {
 	if _, st, _ := call[app.InstanceStatus](t, http.MethodGet, ts.URL+"/api/status"+dir); st.Name != "shop" {
 		t.Fatalf("status %+v", st)
 	}
+	if _, diags, _ := call[[]app.Diagnosis](t, http.MethodGet, ts.URL+"/api/diagnose"+dir+"&service=web"); len(diags) != 1 || diags[0].Service != "web" {
+		t.Errorf("diagnose %+v", diags)
+	}
 	if _, logs, _ := call[Logs](t, http.MethodGet, ts.URL+"/api/logs"+dir); !strings.Contains(logs.Output, "logs --no-color --timestamps --tail 200\n") {
 		t.Errorf("logs %q", logs.Output)
 	}
@@ -117,7 +120,7 @@ func lastUp(w *apptest.World) []string {
 func TestAPIErrors(t *testing.T) {
 	w, ts := start(t)
 	elsewhere := "?dir=" + url.QueryEscape(t.TempDir())
-	for _, u := range []string{"/api/status", "/api/logs"} {
+	for _, u := range []string{"/api/status", "/api/diagnose", "/api/logs"} {
 		if code, _, e := call[any](t, http.MethodGet, ts.URL+u+"?dir=relative"); code != http.StatusBadRequest || e.Code != "usage" {
 			t.Errorf("%s with a relative dir: %d %+v", u, code, e)
 		}

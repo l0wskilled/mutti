@@ -34,10 +34,11 @@ type Fake struct {
 	// labels, as Docker may right after it started.
 	CreateVolumeHidesLabels bool
 
-	runs   []engine.ContainerSpec
-	files  map[string]map[string][]byte // container id -> path -> content
-	mounts map[string][]engine.Mount
-	subs   map[*subscriber]bool
+	runs    []engine.ContainerSpec
+	runtime map[string]engine.Runtime    // container id -> what InspectContainer reports
+	files   map[string]map[string][]byte // container id -> path -> content
+	mounts  map[string][]engine.Mount
+	subs    map[*subscriber]bool
 }
 
 // subscriber is one Events stream.
@@ -492,7 +493,7 @@ func (f *Fake) InspectContainer(_ context.Context, id string) (engine.ContainerD
 	if !ok {
 		return engine.ContainerDetails{}, false, nil
 	}
-	d := engine.ContainerDetails{ID: c.ID, Name: c.Name, State: c.State, Labels: maps.Clone(c.Labels), Networks: map[string][]string{}, IPs: map[string]string{}, Mounts: slices.Clone(f.mounts[c.ID])}
+	d := engine.ContainerDetails{ID: c.ID, Name: c.Name, State: c.State, Labels: maps.Clone(c.Labels), Networks: map[string][]string{}, IPs: map[string]string{}, Mounts: slices.Clone(f.mounts[c.ID]), Runtime: f.runtime[c.ID]}
 	for i, n := range c.Networks {
 		d.Networks[n] = slices.Clone(f.s.Aliases[c.ID][n])
 		if c.State == "running" {
@@ -500,6 +501,16 @@ func (f *Fake) InspectContainer(_ context.Context, id string) (engine.ContainerD
 		}
 	}
 	return d, true, nil
+}
+
+// SetRuntime sets how a container last ran, as InspectContainer reports it.
+func (f *Fake) SetRuntime(id string, r engine.Runtime) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.runtime == nil {
+		f.runtime = map[string]engine.Runtime{}
+	}
+	f.runtime[id] = r
 }
 
 // Files returns what was copied into a container.

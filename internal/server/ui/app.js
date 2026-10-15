@@ -7,6 +7,7 @@ const icons = {
   open: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   play: '<svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg>',
   stop: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  alert: '<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5"/></svg>',
   restart: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
@@ -337,7 +338,34 @@ function row(label, valueNode, copyText) {
   );
 }
 
-function serviceCard(s, svc) {
+// diagnosisBox shows what is wrong with a service and the evidence: its health checks and logs.
+function diagnosisBox(s, d) {
+  const last = (d.health || []).at(-1);
+  const text = [`${d.service}: ${d.problem}`, d.hint ? `-> ${d.hint}` : "", last ? `last health check (exit ${last.exitCode}):\n${last.output}` : "", d.logs ? `last logs:\n${d.logs}` : ""].filter(Boolean).join("\n\n");
+  return el(
+    "div",
+    { class: "diag", role: "alert" },
+    el("div", { class: "diag-head" }, iconSpan("alert"), el("strong", { text: d.problem })),
+    d.hint ? el("p", { class: "hint", text: "→ " + d.hint }) : null,
+    last
+      ? el(
+          "details",
+          { open: true },
+          el("summary", { text: `Last health check · exit ${last.exitCode} · ${new Date(last.time).toLocaleTimeString()}${d.health.length > 1 ? ` · ${d.health.filter((h) => h.exitCode !== 0).length} of ${d.health.length} failed` : ""}` }),
+          el("pre", { class: "logs code", text: last.output || "(no output)" }),
+        )
+      : null,
+    d.logs ? el("details", { open: true }, el("summary", { text: "Last logs" }), el("pre", { class: "logs code wrap" }, logFragment(d.logs))) : null,
+    el(
+      "div",
+      { class: "diag-actions" },
+      el("button", { class: "btn sm", onclick: () => copy(text) }, iconSpan("copy"), el("span", { text: "Copy diagnosis" })),
+      el("button", { class: "btn sm", onclick: () => { $("l-service").value = d.service; selectTab("logs"); } }, iconSpan("logs"), el("span", { text: "All logs" })),
+    ),
+  );
+}
+
+function serviceCard(s, svc, diag) {
   const [kind, label] = badgeOf(svc);
   const rows = [];
   for (const u of svc.urls || []) rows.push(row("URL", el("a", { href: u, target: "_blank", rel: "noopener", text: u }), u));
@@ -352,9 +380,10 @@ function serviceCard(s, svc) {
       el("strong", { text: svc.service }),
       el("span", { class: `badge ${kind}`, text: label }),
       el("span", { class: "svc-status", text: svc.status }),
-      el("span", { class: "svc-actions" }, ...(svc.state === "running" ? ["restart", "stop"] : ["up"]).map((action) => serviceButton(s, action, [svc.service]))),
+      el("span", { class: "svc-actions" }, ...(svc.state === "running" || svc.state === "restarting" ? ["restart", "stop"] : ["up"]).map((action) => serviceButton(s, action, [svc.service]))),
     ),
     rows.length ? el("div", { class: "svc-rows" }, ...rows) : null,
+    diag ? diagnosisBox(s, diag) : null,
   );
 }
 
@@ -412,6 +441,8 @@ async function loadServices() {
   let st;
   try {
     st = await api(`/api/status?dir=${q(s.path)}`);
+    // What is not well comes with its diagnosis; a failing diagnosis must not hide the services.
+    st.diags = new Map((await api(`/api/diagnose?dir=${q(s.path)}`).catch(() => [])).map((d) => [d.service, d]));
   } catch (err) {
     panel.replaceChildren(el("p", { class: "muted", text: err.message + (err.hint ? "\n→ " + err.hint : "") }));
     return;
@@ -430,10 +461,11 @@ async function loadServices() {
         "div",
         { class: "svc-group" },
         profile ? profileHead(s, profile, services) : null,
-        el("div", { class: "services" }, ...services.map((svc) => serviceCard(s, svc))),
+        el("div", { class: "services" }, ...services.map((svc) => serviceCard(s, svc, st.diags.get(svc.service)))),
       ),
     ),
   );
+  for (const pre of panel.querySelectorAll(".diag pre")) pre.scrollTop = pre.scrollHeight; // newest lines in view
   const select = $("l-service");
   const current = select.value;
   select.replaceChildren(el("option", { value: "", text: "All services" }), ...st.services.map((x) => el("option", { value: x.service, text: x.service })));
@@ -468,11 +500,9 @@ async function loadLogs() {
   renderLogs();
 }
 
-function renderLogs() {
-  const out = $("l-output");
-  const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
-  const filter = $("l-filter").value.toLowerCase();
-  const lines = lastLogs.split("\n").filter((l) => l && (!filter || l.toLowerCase().includes(filter)));
+// logFragment renders log lines with the service name, timestamp and errors set apart.
+function logFragment(text, filter = "") {
+  const lines = text.split("\n").filter((l) => l && (!filter || l.toLowerCase().includes(filter)));
   const frag = document.createDocumentFragment();
   if (lines.length === 0) frag.append(el("span", { class: "lempty", text: filter ? "No line matches the filter." : "No output yet." }));
   for (const line of lines) {
@@ -483,7 +513,14 @@ function renderLogs() {
     else span.append(line);
     frag.append(span, "\n");
   }
-  out.replaceChildren(frag);
+  return frag;
+}
+
+function renderLogs() {
+  const out = $("l-output");
+  const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
+  const filter = $("l-filter").value.toLowerCase();
+  out.replaceChildren(logFragment(lastLogs, filter));
   if (atBottom) out.scrollTop = out.scrollHeight;
 }
 

@@ -317,8 +317,18 @@ func (m *Moby) InspectContainer(ctx context.Context, id string) (ContainerDetail
 	}
 	c := res.Container
 	d := ContainerDetails{ID: c.ID, Name: strings.TrimPrefix(c.Name, "/"), Networks: map[string][]string{}, IPs: map[string]string{}}
+	d.Runtime.RestartCount = c.RestartCount
 	if c.State != nil {
 		d.State = string(c.State.Status)
+		d.Runtime.ExitCode, d.Runtime.OOMKilled, d.Runtime.Error = c.State.ExitCode, c.State.OOMKilled, c.State.Error
+		if t, err := time.Parse(time.RFC3339Nano, c.State.FinishedAt); err == nil && t.Year() > 1 {
+			d.Runtime.FinishedAt = t
+		}
+		if c.State.Health != nil {
+			for _, h := range c.State.Health.Log {
+				d.Runtime.Health = append(d.Runtime.Health, HealthProbe{Start: h.Start, ExitCode: h.ExitCode, Output: h.Output})
+			}
+		}
 	}
 	if c.Config != nil {
 		d.Labels = c.Config.Labels

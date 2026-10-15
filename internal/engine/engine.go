@@ -127,6 +127,24 @@ type ContainerDetails struct {
 	Networks map[string][]string // network name -> extra DNS aliases
 	IPs      map[string]string   // network name -> IP address
 	Mounts   []Mount             // Source is the path on the daemon's host
+	Runtime  Runtime
+}
+
+// Runtime is how a container last ran: what ended it and what its health checks said.
+type Runtime struct {
+	ExitCode     int
+	OOMKilled    bool
+	Error        string    // set when Docker could not start the container
+	RestartCount int       // restarts by the restart policy
+	FinishedAt   time.Time // zero while it never ended
+	Health       []HealthProbe
+}
+
+// HealthProbe is one health check result; Docker keeps the last few, oldest first.
+type HealthProbe struct {
+	Start    time.Time
+	ExitCode int
+	Output   string
 }
 
 // Info describes the daemon.

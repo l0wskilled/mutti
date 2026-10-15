@@ -116,6 +116,10 @@ func TestTools(t *testing.T) {
 		t.Fatalf("relative dir: %s %+v", e, st)
 	}
 
+	var diags Diagnoses
+	if e := call(t, s, "diagnose", map[string]any{"services": []string{"web"}}, &diags); e != "" || len(diags.Services) != 1 {
+		t.Fatalf("diagnose: %s %+v", e, diags)
+	}
 	var done Done
 	if e := call(t, s, "restart", map[string]any{"services": []string{"web"}}, &done); e != "" || done.Instance != "shop" {
 		t.Fatalf("restart web: %s %+v", e, done)
@@ -130,7 +134,7 @@ func TestTools(t *testing.T) {
 
 func TestToolErrorsCarryCodeAndHint(t *testing.T) {
 	s, fc, root := setup(t)
-	for _, tool := range []string{"status", "url", "logs", "up", "stop", "restart", "down", "worktree_add"} {
+	for _, tool := range []string{"status", "diagnose", "url", "logs", "up", "stop", "restart", "down", "worktree_add"} {
 		args := map[string]any{"dir": t.TempDir()}
 		if tool == "worktree_add" {
 			args = map[string]any{"dir": filepath.Dir(root), "name": "x"}

@@ -33,6 +33,7 @@ func New(a *app.App, dir, version string) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{Name: "list", Description: "List every mutti environment on this machine with status, branch, URLs and ports.", Annotations: readOnly}, s.list)
 	mcp.AddTool(srv, &mcp.Tool{Name: "status", Description: "Show the environment of a worktree service by service: state, URLs, ports.", Annotations: readOnly}, s.status)
 	mcp.AddTool(srv, &mcp.Tool{Name: "url", Description: "Return the HTTPS URL of the environment, or of one of its services.", Annotations: readOnly}, s.url)
+	mcp.AddTool(srv, &mcp.Tool{Name: "diagnose", Description: "Explain what is wrong with the environment's services: why they are unhealthy, crashing or gone, their health check output and last logs.", Annotations: readOnly}, s.diagnose)
 	mcp.AddTool(srv, &mcp.Tool{Name: "logs", Description: "Return the recent logs of the environment's services.", Annotations: readOnly}, s.logs)
 	mcp.AddTool(srv, &mcp.Tool{Name: "up", Description: "Start the environment of a worktree (or some of its services) and wait until it is healthy.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.up)
 	mcp.AddTool(srv, &mcp.Tool{Name: "stop", Description: "Stop the environment's containers, or some services'; data and containers stay.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.stop)
@@ -112,6 +113,20 @@ func (s *server) status(ctx context.Context, _ *mcp.CallToolRequest, in Where) (
 		return nil, nil, toolErr(err)
 	}
 	return nil, st, nil
+}
+
+// Diagnoses are the explanations of the services that are not well.
+type Diagnoses struct {
+	Services []app.Diagnosis `json:"services"`
+}
+
+func (s *server) diagnose(ctx context.Context, _ *mcp.CallToolRequest, in ServicesInput) (*mcp.CallToolResult, Diagnoses, error) {
+	a, _ := s.call()
+	diags, err := a.Diagnose(ctx, s.resolve(in.Dir), in.Services...)
+	if err != nil {
+		return nil, Diagnoses{}, toolErr(err)
+	}
+	return nil, Diagnoses{Services: diags}, nil
 }
 
 // URLInput selects a service.

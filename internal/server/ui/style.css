@@ -393,3 +393,13 @@ a:hover { text-decoration: underline; }
   .health { display: none; }
   .main { padding: 1.25rem 1rem 2rem; }
 }
+
+/* Diagnosis of a service that is not well */
+.diag { margin-top: 0.75rem; padding: 0.75rem 0.85rem; border: 1px solid var(--red); border-radius: 10px; background: var(--red-soft); }
+.diag-head { display: flex; align-items: center; gap: 0.5rem; color: var(--red); }
+.diag-head svg { width: 1.05rem; height: 1.05rem; }
+.diag .hint { margin: 0.35rem 0 0.5rem; font-size: 0.85rem; }
+.diag details { margin-top: 0.5rem; }
+.diag summary { cursor: pointer; font-size: 0.8rem; color: var(--text-2); }
+.diag .code { margin-top: 0.35rem; max-height: 16rem; flex: none; font-size: 0.78rem; }
+.diag-actions { display: flex; gap: 0.4rem; margin-top: 0.6rem; }

@@ -76,9 +76,11 @@ its API on one origin, a full stack with database, hooks and tests, and project 
 | | |
 |---|---|
 | `mutti up` / `stop` / `down` / `destroy` | start, stop, remove containers (keep data), remove everything |
+| `mutti up` / `stop` / `restart <service...>` | the same for single services |
 | `mutti list` | every instance on this machine; `--watch` keeps it current |
 | `mutti events` | what happens to the instances' containers, as it happens |
-| `mutti status` | this instance, service by service |
+| `mutti status` | this instance, service by service, with a diagnosis of what is not well |
+| `mutti diagnose [service...]` | why services are unhealthy, crashing or gone: health check output, exit codes, last logs |
 | `mutti exec <service> -- <cmd>` | run a command in a service, as your host user |
 | `mutti shell [service]` | interactive shell |
 | `mutti logs [service]` | logs, with the flags of `docker compose logs` |

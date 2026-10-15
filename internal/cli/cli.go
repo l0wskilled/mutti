@@ -128,7 +128,7 @@ func newRoot(d Deps, p *printer) *cobra.Command {
 		initCmd(&d, p), upCmd(&d, p), stopCmd(&d, p), restartCmd(&d, p), downCmd(&d, p), destroyCmd(&d, p),
 		listCmd(&d, p), eventsCmd(&d, p), logsCmd(&d), execCmd(&d), composeCmd(&d),
 		tidyCmd(&d, p), renameCmd(&d, p), doctorCmd(&d, p), routerCmd(&d, p), trustCmd(&d, p), worktreeCmd(&d, p),
-		resetCmd(&d, p), urlCmd(&d, p), openCmd(&d, p), shellCmd(&d), statusCmd(&d, p), envCmd(&d, p), promptCmd(&d), attachCmd(&d, p), runCmd(&d, p), runIDCmd(&d), sweepCmd(&d, p), mcpCmd(&d), serveCmd(&d),
+		resetCmd(&d, p), urlCmd(&d, p), openCmd(&d, p), shellCmd(&d), statusCmd(&d, p), diagnoseCmd(&d, p), envCmd(&d, p), promptCmd(&d), attachCmd(&d, p), runCmd(&d, p), runIDCmd(&d), sweepCmd(&d, p), mcpCmd(&d), serveCmd(&d),
 	}
 	root.AddGroup(&cobra.Group{ID: "builtin", Title: "Commands:"}, &cobra.Group{ID: "custom", Title: "Project commands (.mutti/commands):"})
 	reserved := []string{"help", "completion"}
@@ -283,6 +283,7 @@ those and what they depend on; hooks of services that do not run are skipped.`,
 			opts.Services = args
 			res, err := d.App.Up(c.Context(), d.Dir, opts)
 			if err != nil {
+				explain(c.Context(), d)
 				return err
 			}
 			type upJSON struct {
@@ -336,6 +337,7 @@ func servicesCmd(d *Deps, p *printer, use, short, done string, run func(context.
 		RunE: func(c *cobra.Command, args []string) error {
 			inst, err := run(c.Context(), d.Dir, sel, args...)
 			if err != nil {
+				explain(c.Context(), d)
 				return err
 			}
 			p.result(map[string]any{"instance": toJSON(inst), "services": args}, func(w io.Writer) {
@@ -999,9 +1001,89 @@ func statusCmd(d *Deps, p *printer) *cobra.Command {
 					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", s.Service, state, strings.Join(s.URLs, " "), strings.Join(ports, " "))
 				}
 				_ = tw.Flush()
+				// What is not well comes with its diagnosis, short; mutti diagnose has it all.
+				if diags, err := d.App.Diagnose(c.Context(), d.Dir); err == nil {
+					for _, diag := range diags {
+						fmt.Fprintln(w)
+						printDiagnosis(w, diag, 8)
+					}
+					if len(diags) > 0 {
+						fmt.Fprintln(w, "\nMore: mutti diagnose")
+					}
+				}
 			})
 			return nil
 		},
+	}
+}
+
+func diagnoseCmd(d *Deps, p *printer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "diagnose [service...]",
+		Short: "Explain what is wrong with the instance's services: health checks, exit codes, last logs",
+		Long: `Explain what is wrong with the instance's services: why they are unhealthy, crashing or
+gone, what their health checks said and what they printed last. Without services it looks at
+every service that is not well; given services, it explains those whatever their state.`,
+		ValidArgsFunction: completeServices(d),
+		RunE: func(c *cobra.Command, args []string) error {
+			diags, err := d.App.Diagnose(c.Context(), d.Dir, args...)
+			if err != nil {
+				return err
+			}
+			p.result(diags, func(w io.Writer) {
+				if len(diags) == 0 {
+					fmt.Fprintln(w, "All services are well.")
+					return
+				}
+				for i, diag := range diags {
+					if i > 0 {
+						fmt.Fprintln(w)
+					}
+					printDiagnosis(w, diag, 0)
+				}
+			})
+			return nil
+		},
+	}
+}
+
+// explain prints, after a failed command, the diagnosis of what is not well, to stderr.
+func explain(ctx context.Context, d *Deps) {
+	diags, err := d.App.Diagnose(ctx, d.Dir)
+	if err != nil {
+		return
+	}
+	for _, diag := range diags {
+		fmt.Fprintln(d.Err)
+		printDiagnosis(d.Err, diag, 8)
+	}
+}
+
+// printDiagnosis prints a diagnosis with at most logLines lines of logs; 0 prints them all.
+func printDiagnosis(w io.Writer, d app.Diagnosis, logLines int) {
+	fmt.Fprintf(w, "! %s: %s\n", d.Service, d.Problem)
+	if d.Hint != "" {
+		fmt.Fprintf(w, "  -> %s\n", d.Hint)
+	}
+	if n := len(d.Health); n > 0 {
+		last := d.Health[n-1]
+		fmt.Fprintf(w, "  last health check (%s, exit %d):\n", last.Time.Local().Format(time.TimeOnly), last.ExitCode)
+		printIndented(w, last.Output, 0)
+	}
+	if strings.TrimSpace(d.Logs) != "" {
+		fmt.Fprintln(w, "  last logs:")
+		printIndented(w, d.Logs, logLines)
+	}
+}
+
+// printIndented prints the last max lines of text (all for 0), indented.
+func printIndented(w io.Writer, text string, maxLines int) {
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	if maxLines > 0 && len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	for _, l := range lines {
+		fmt.Fprintf(w, "    %s\n", l)
 	}
 }
 

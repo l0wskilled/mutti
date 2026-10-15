@@ -183,3 +183,42 @@ func TestMobyFixedHostPort(t *testing.T) {
 		t.Fatalf("want host port %d: %+v", port, cs)
 	}
 }
+
+func TestMobyReportsHowAContainerRan(t *testing.T) {
+	ctx := context.Background()
+	e, err := engine.Connect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = e.Close() })
+	c, err := client.New(client.FromEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image: testImage, Cmd: []string{"sh", "-c", "sleep 2; exit 3"},
+			Healthcheck: &container.HealthConfig{Test: []string{"CMD-SHELL", "echo probing; exit 1"}, Interval: 200 * time.Millisecond},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = c.ContainerRemove(ctx, res.ID, client.ContainerRemoveOptions{Force: true}) })
+	if _, err := c.ContainerStart(ctx, res.ID, client.ContainerStartOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	var d engine.ContainerDetails
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if d, _, err = e.InspectContainer(ctx, res.ID); err != nil {
+			t.Fatal(err)
+		}
+		if d.State == "exited" {
+			break
+		}
+	}
+	r := d.Runtime
+	if d.State != "exited" || r.ExitCode != 3 || r.FinishedAt.IsZero() || len(r.Health) == 0 || r.Health[0].ExitCode != 1 || r.Health[0].Output != "probing\n" {
+		t.Fatalf("runtime %+v (state %s)", r, d.State)
+	}
+}

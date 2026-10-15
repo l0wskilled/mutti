@@ -19,6 +19,7 @@ mutti runs one isolated copy of your Compose project per git worktree and cleans
 * [mutti attach](mutti_attach.md)	 - Connect the container mutti runs in to this instance's network (e.g. a CI step)
 * [mutti compose](mutti_compose.md)	 - Run any docker compose command against this instance
 * [mutti destroy](mutti_destroy.md)	 - Remove the instance with all its data
+* [mutti diagnose](mutti_diagnose.md)	 - Explain what is wrong with the instance's services: health checks, exit codes, last logs
 * [mutti doctor](mutti_doctor.md)	 - Check Docker, Compose and this project
 * [mutti down](mutti_down.md)	 - Remove the instance's containers and networks, keep its data
 * [mutti env](mutti_env.md)	 - Print the MUTTI_* variables, for `mutti env | source` (fish) or `eval "$(mutti env)"`
