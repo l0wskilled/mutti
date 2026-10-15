@@ -64,6 +64,12 @@ func (a *App) claim(ctx context.Context, inst *Instance) error {
 	if err != nil {
 		return engineErr(err)
 	}
+	// Right after it started, Docker may answer for an existing volume without its labels.
+	if vol.Labels[engine.LabelRole] == "" {
+		if vol, _, err = a.Engine.InspectVolume(ctx, vol.Name); err != nil {
+			return engineErr(err)
+		}
+	}
 	if vol.Labels[engine.LabelID] == inst.ID {
 		// Moved, or claimed before claims said where their paths are valid: write it anew.
 		if vol.Labels[engine.LabelPath] != inst.Root || vol.Labels[LabelOrigin] == "" {

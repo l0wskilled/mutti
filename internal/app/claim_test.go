@@ -134,6 +134,22 @@ func TestCopiedWorktreeIsRefused(t *testing.T) {
 	}
 }
 
+func TestClaimReadsLabelsDockerLeftOut(t *testing.T) {
+	root := newRepo(t, "shop")
+	h := newHarness(t, webModel())
+	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	h.eng.CreateVolumeHidesLabels = true
+	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
+		t.Fatalf("own claim answered without labels: %v", err)
+	}
+	h.eng.FailOn = map[string]error{"InspectVolume": engine.ErrUnavailable}
+	if _, err := h.app.Up(ctx, root, UpOptions{}); appErrCode(err) != CodeDockerUnavailable {
+		t.Fatalf("inspect failure: %v", err)
+	}
+}
+
 func TestClaimFailures(t *testing.T) {
 	root := newRepo(t, "shop")
 	boom := errors.New("boom")

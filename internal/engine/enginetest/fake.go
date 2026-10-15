@@ -30,6 +30,9 @@ type Fake struct {
 	OnCall func(method string) error
 	// RunExit is the exit code RunContainer reports.
 	RunExit int
+	// CreateVolumeHidesLabels makes CreateVolume answer for an existing volume without its
+	// labels, as Docker may right after it started.
+	CreateVolumeHidesLabels bool
 
 	runs   []engine.ContainerSpec
 	files  map[string]map[string][]byte // container id -> path -> content
@@ -199,6 +202,9 @@ func (f *Fake) CreateVolume(_ context.Context, name string, labels map[string]st
 		return engine.Volume{}, err
 	}
 	if v, ok := f.s.Volumes[name]; ok {
+		if f.CreateVolumeHidesLabels {
+			return engine.Volume{Name: name}, nil
+		}
 		return cloneVolume(v), nil
 	}
 	v := engine.Volume{Name: name, Labels: maps.Clone(labels)}
