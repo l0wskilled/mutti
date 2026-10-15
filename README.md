@@ -167,7 +167,8 @@ Otherwise it refuses to touch the host's router; `MUTTI_ROUTER_NAME`, `MUTTI_HTT
 `mutti tui` shows every instance on this machine, the services of the selected one and what is
 wrong with them, kept current as containers change. Keys act on the selected instance or service:
 start, stop, restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and
-destroy. `:` searches every mutti command, the project's own commands included, and runs it; `?`
+destroy, which removes an instance whatever state it is in, also when its worktree is gone. `T`
+tidies what deleted worktrees left behind. `:` searches every mutti command, the project's own commands included, and runs it; `?`
 lists the keys.
 
 ## Web UI

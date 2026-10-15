@@ -145,6 +145,7 @@ func newModel(ctx context.Context, opts Options) *model {
 	m.input.Prompt = "› "
 	m.help = help.New()
 	m.viewer = viewport.New()
+	m.viewer.SoftWrap = true
 	m.palette = list.New(m.paletteItems(), list.NewDefaultDelegate(), 60, 20)
 	m.palette.SetShowStatusBar(false)
 	m.palette.SetShowHelp(false)

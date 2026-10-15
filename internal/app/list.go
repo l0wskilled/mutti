@@ -206,6 +206,17 @@ func (a *App) Tidy(ctx context.Context, opts TidyOptions) (*TidyResult, error) {
 	return res, nil
 }
 
+// Remove removes everything of the named instance from Docker and from mutti's state: its
+// containers, networks, volumes and claim. It works by labels alone, so it needs neither the
+// worktree nor Compose: it removes what a deleted worktree or a broken project left behind.
+func (a *App) Remove(ctx context.Context, name string) error {
+	if err := a.purge(ctx, name); err != nil {
+		return err
+	}
+	a.refreshRouter(ctx)
+	return nil
+}
+
 // lastUsed is the latest of the last mutti command on an instance and the last git activity
 // in its worktree.
 func (a *App) lastUsed(ctx context.Context, s Summary) time.Time {

@@ -4,10 +4,10 @@ import "charm.land/bubbles/v2/key"
 
 // keyMap is every key of the main view; it doubles as the help.
 type keyMap struct {
-	Up, Down, Switch, Enter                     key.Binding
-	Start, Stop, Restart, Down2, Destroy, Reset key.Binding
-	Open, Copy, Logs, Diagnose, Exec, Worktree  key.Binding
-	Palette, Help, Quit                         key.Binding
+	Up, Down, Switch, Enter                           key.Binding
+	Start, Stop, Restart, Down2, Destroy, Reset, Tidy key.Binding
+	Open, Copy, Logs, Diagnose, Exec, Worktree        key.Binding
+	Palette, Help, Quit                               key.Binding
 }
 
 func newKeyMap() keyMap {
@@ -25,6 +25,7 @@ func newKeyMap() keyMap {
 		Down2:    b([]string{"d"}, "d", "down"),
 		Destroy:  b([]string{"X"}, "X", "destroy"),
 		Reset:    b([]string{"R"}, "R", "reset data"),
+		Tidy:     b([]string{"T"}, "T", "tidy deleted worktrees"),
 		Open:     b([]string{"o"}, "o", "open in browser"),
 		Copy:     b([]string{"y"}, "y", "copy URL"),
 		Logs:     b([]string{"l"}, "l", "logs"),
@@ -46,7 +47,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Switch, k.Enter, k.Palette, k.Help, k.Quit},
-		{k.Start, k.Stop, k.Restart, k.Down2, k.Reset, k.Destroy},
+		{k.Start, k.Stop, k.Restart, k.Down2, k.Reset, k.Destroy, k.Tidy},
 		{k.Open, k.Copy, k.Logs, k.Diagnose, k.Exec, k.Worktree},
 	}
 }

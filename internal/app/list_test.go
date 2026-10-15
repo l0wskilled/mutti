@@ -482,3 +482,23 @@ func TestOptionalServicesCountOnlyWhileTheyRun(t *testing.T) {
 		t.Fatalf("tool stopped: %+v", s)
 	}
 }
+
+func TestRemoveNeedsNoWorktree(t *testing.T) {
+	root := newRepo(t, "shop")
+	h := newHarness(t, webModel())
+	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.app.Remove(ctx, "shop"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := h.app.List(ctx); len(list) != 0 {
+		t.Errorf("left: %+v", list)
+	}
+	if err := h.app.Remove(ctx, "../x"); err == nil {
+		t.Error("an invalid name")
+	}
+}

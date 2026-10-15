@@ -104,7 +104,7 @@ func (m *model) withCheatSheet(instances string, h int) string {
 		"  " + k("enter", "shell") + "  " + k("e", "exec") + "  " + k("y", "copy URL"),
 		s.faintText.Render("instance"),
 		"  " + k("d", "down") + "  " + k("R", "reset") + "  " + k("X", "destroy"),
-		"  " + k("n", "new worktree"),
+		"  " + k("n", "new worktree") + "  " + k("T", "tidy"),
 		s.faintText.Render("everything else"),
 		"  " + k(":", "search every mutti command"),
 		"  " + k("?", "help"),
@@ -161,8 +161,14 @@ func (m *model) servicesView(w int) string {
 	}
 	lines = append(lines, s.faintText.Render(trunc(c.Path, w)), "")
 	switch {
+	case c.Orphaned:
+		return strings.Join(append(lines,
+			s.errText.Render("Its worktree is gone."),
+			s.muted.Width(w).Render("Its containers, networks and data are left over."),
+			"",
+			s.key.Render("X")+s.muted.Render(" removes them · ")+s.key.Render("T")+s.muted.Render(" tidies every deleted worktree")), "\n")
 	case m.statusErr != nil:
-		return strings.Join(append(lines, s.errText.Render(m.statusErr.Error())), "\n")
+		return strings.Join(append(lines, s.errText.Width(w).Render(m.statusErr.Error())), "\n")
 	case m.status == nil:
 		return strings.Join(append(lines, s.muted.Render(m.spinner.View()+" loading…")), "\n")
 	}

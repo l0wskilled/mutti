@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -734,5 +735,69 @@ func TestRun(t *testing.T) {
 	cancel()
 	if err := Run(ctx, Options{App: w.App, Dir: w.Root}, strings.NewReader(""), &out); err != nil {
 		t.Fatalf("cancelled: %v", err)
+	}
+}
+
+func TestGoneWorktree(t *testing.T) {
+	w := setup(t)
+	if err := os.RemoveAll(w.Root); err != nil {
+		t.Fatal(err)
+	}
+	feed[instancesMsg](t, w.m, w.m.loadInstances())
+	if c := w.m.current(); c == nil || !c.Orphaned {
+		t.Fatalf("orphaned: %+v", c)
+	}
+	if s := w.screen(); !strings.Contains(s, "Its worktree is gone.") || !strings.Contains(s, "X removes them") {
+		t.Errorf("gone:\n%s", s)
+	}
+	if press(w.m, "u"); !strings.Contains(w.m.toast, "the worktree of shop is gone: X removes what is left") {
+		t.Errorf("start: %q", w.m.toast)
+	}
+	// Destroy removes what is left without the worktree.
+	press(w.m, "X")
+	feed[doneMsg](t, w.m, press(w.m, "y"))
+	if !w.m.toastOK || !strings.Contains(w.m.toast, "shop is gone") {
+		t.Fatalf("destroy: %q", w.m.toast)
+	}
+	if list, _ := w.App.List(context.Background()); len(list) != 0 {
+		t.Errorf("left: %+v", list)
+	}
+}
+
+func TestDestroyWhateverState(t *testing.T) {
+	w := setup(t)
+	w.Compose.Exit = func(args []string) int { return map[string]int{"down": 1}[args[0]] }
+	press(w.m, "X")
+	feed[doneMsg](t, w.m, press(w.m, "y"))
+	if !w.m.toastOK {
+		t.Fatalf("a broken Compose does not stop destroy: %q", w.m.toast)
+	}
+	if list, _ := w.App.List(context.Background()); len(list) != 0 {
+		t.Errorf("left: %+v", list)
+	}
+}
+
+func TestTidy(t *testing.T) {
+	w := setup(t)
+	if press(w.m, "T"); !strings.Contains(w.m.toast, "nothing to tidy") {
+		t.Errorf("nothing: %q", w.m.toast)
+	}
+	if err := os.RemoveAll(w.Root); err != nil {
+		t.Fatal(err)
+	}
+	feed[instancesMsg](t, w.m, w.m.loadInstances())
+	press(w.m, "T")
+	if w.m.mode != modeConfirm || !strings.Contains(w.screen(), "Remove what 1 deleted worktree(s) left behind?") {
+		t.Fatalf("asks:\n%s", w.screen())
+	}
+	feed[doneMsg](t, w.m, press(w.m, "y"))
+	if w.m.toast != "removed 1 instance(s)" {
+		t.Errorf("tidied: %q", w.m.toast)
+	}
+	w.Engine.FailOn = map[string]error{"ListVolumes": engine.ErrUnavailable}
+	w.m.instances = []app.Summary{{Name: "x", Path: "/x", Orphaned: true}}
+	press(w.m, "T")
+	if done := feed[doneMsg](t, w.m, press(w.m, "y")); done.err == nil {
+		t.Error("a failing tidy")
 	}
 }

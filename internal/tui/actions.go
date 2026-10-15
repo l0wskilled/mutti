@@ -44,8 +44,17 @@ func (m *model) actions() []action {
 			return run()
 		}
 	}
+	// Most actions need the worktree; a gone one leaves only removing what is left.
+	needWorktree := func(run func() tea.Cmd) func() tea.Cmd {
+		return needInstance(func() tea.Cmd {
+			if c := m.current(); c != nil && c.Orphaned {
+				return m.setToast("the worktree of "+c.Name+" is gone: X removes what is left", false)
+			}
+			return run()
+		})
+	}
 	return []action{
-		{k.Start, "Start", "start the instance, or the selected service", needInstance(func() tea.Cmd {
+		{k.Start, "Start", "start the instance, or the selected service", needWorktree(func() tea.Cmd {
 			return m.act("starting "+what, func(a *app.App) (string, error) {
 				res, err := a.Up(m.ctx, path, app.UpOptions{Services: services})
 				if err != nil {
@@ -54,19 +63,19 @@ func (m *model) actions() []action {
 				return what + " is up " + res.URL, nil
 			})
 		})},
-		{k.Stop, "Stop", "stop the instance, or the selected service; data stays", needInstance(func() tea.Cmd {
+		{k.Stop, "Stop", "stop the instance, or the selected service; data stays", needWorktree(func() tea.Cmd {
 			return m.act("stopping "+what, func(a *app.App) (string, error) {
 				_, err := a.Stop(m.ctx, path, app.Selection{}, services...)
 				return what + " stopped", err
 			})
 		})},
-		{k.Restart, "Restart", "restart the instance, or the selected service", needInstance(func() tea.Cmd {
+		{k.Restart, "Restart", "restart the instance, or the selected service", needWorktree(func() tea.Cmd {
 			return m.act("restarting "+what, func(a *app.App) (string, error) {
 				_, err := a.Restart(m.ctx, path, app.Selection{}, services...)
 				return what + " restarted", err
 			})
 		})},
-		{k.Down2, "Down", "remove the containers and networks; data stays", needInstance(func() tea.Cmd {
+		{k.Down2, "Down", "remove the containers and networks; data stays", needWorktree(func() tea.Cmd {
 			return m.confirmThen("Remove the containers of "+m.instanceName()+"? Its data stays.", func() tea.Cmd {
 				return m.act("removing "+m.instanceName(), func(a *app.App) (string, error) {
 					_, err := a.Down(m.ctx, path, app.Selection{})
@@ -74,25 +83,52 @@ func (m *model) actions() []action {
 				})
 			})
 		})},
-		{k.Reset, "Reset", "delete the data and start fresh: the bootstrap runs again", needInstance(func() tea.Cmd {
+		{k.Reset, "Reset", "delete the data and start fresh: the bootstrap runs again", needWorktree(func() tea.Cmd {
 			return m.confirmThen("Delete all data of "+m.instanceName()+" and start it fresh?", func() tea.Cmd { return m.runInTerminal(path, "reset", "--yes") })
 		})},
 		{k.Destroy, "Destroy", "remove everything of the instance: containers, data, its name", needInstance(func() tea.Cmd {
-			return m.confirmThen("Destroy "+m.instanceName()+" with all its data?", func() tea.Cmd {
-				return m.act("destroying "+m.instanceName(), func(a *app.App) (string, error) {
-					_, err := a.Destroy(m.ctx, path)
-					return m.instanceName() + " is gone", err
+			name, orphaned := m.instanceName(), m.current().Orphaned
+			return m.confirmThen("Destroy "+name+" with all its data?", func() tea.Cmd {
+				return m.act("destroying "+name, func(a *app.App) (string, error) {
+					// Through Compose and the pre-down hooks where the project still works; by
+					// labels where it does not, so the instance goes away whatever state it is in.
+					if !orphaned {
+						if _, err := a.Destroy(m.ctx, path); err == nil {
+							return name + " is gone", nil
+						}
+					}
+					return name + " is gone", a.Remove(m.ctx, name)
 				})
 			})
 		})},
-		{k.Open, "Open", "open the instance or the selected service in the browser", needInstance(func() tea.Cmd {
+		{k.Tidy, "Tidy", "remove what deleted worktrees left behind", func() tea.Cmd {
+			var gone []string
+			for _, i := range m.instances {
+				if i.Orphaned {
+					gone = append(gone, i.Name)
+				}
+			}
+			if len(gone) == 0 {
+				return m.setToast("nothing to tidy: every instance has its worktree", true)
+			}
+			return m.confirmThen(fmt.Sprintf("Remove what %d deleted worktree(s) left behind?\n%s", len(gone), strings.Join(gone, ", ")), func() tea.Cmd {
+				return m.act("tidying", func(a *app.App) (string, error) {
+					res, err := a.Tidy(m.ctx, app.TidyOptions{Apply: true})
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("removed %d instance(s)", len(res.Removed)), nil
+				})
+			})
+		}},
+		{k.Open, "Open", "open the instance or the selected service in the browser", needWorktree(func() tea.Cmd {
 			svc := m.service()
 			return m.act("opening", func(a *app.App) (string, error) {
 				url, err := a.Open(m.ctx, path, svc)
 				return "opened " + url, err
 			})
 		})},
-		{k.Copy, "Copy URL", "copy the URL of the instance or the selected service", needInstance(func() tea.Cmd {
+		{k.Copy, "Copy URL", "copy the URL of the instance or the selected service", needWorktree(func() tea.Cmd {
 			svc := m.service()
 			a, _ := m.app()
 			return func() tea.Msg {
@@ -100,20 +136,20 @@ func (m *model) actions() []action {
 				return copyMsg{url: url, err: err}
 			}
 		})},
-		{k.Logs, "Logs", "follow the logs of the instance or the selected service", needInstance(func() tea.Cmd {
+		{k.Logs, "Logs", "follow the logs of the instance or the selected service", needWorktree(func() tea.Cmd {
 			m.logsOf = m.service()
 			m.logsGen++
 			m.openViewer(modeLogs, "Logs of "+what, "loading…")
 			return tea.Batch(m.loadLogs(), m.logsTick())
 		})},
-		{k.Diagnose, "Diagnose", "explain what is wrong: health checks, exit codes, last logs", needInstance(func() tea.Cmd {
+		{k.Diagnose, "Diagnose", "explain what is wrong: health checks, exit codes, last logs", needWorktree(func() tea.Cmd {
 			a, _ := m.app()
 			return func() tea.Msg {
 				diags, err := a.Diagnose(m.ctx, path, services...)
 				return diagnosisMsg{title: "Diagnosis of " + what, diags: diags, err: err}
 			}
 		})},
-		{k.Exec, "Exec", "run a command in the selected service", needInstance(func() tea.Cmd {
+		{k.Exec, "Exec", "run a command in the selected service", needWorktree(func() tea.Cmd {
 			svc := m.service()
 			if svc == "" {
 				return m.setToast("select a service first: tab, then ↑/↓", false)
@@ -122,7 +158,7 @@ func (m *model) actions() []action {
 				return m.runInTerminal(path, "exec", svc, "--", "sh", "-c", cmd)
 			})
 		})},
-		{k.Worktree, "New worktree", "create a git worktree with its own environment, and start it", needInstance(func() tea.Cmd {
+		{k.Worktree, "New worktree", "create a git worktree with its own environment, and start it", needWorktree(func() tea.Cmd {
 			return m.askFor("Name of the new worktree", "", func(name string) tea.Cmd {
 				return m.runInTerminal(path, "worktree", "add", name)
 			})
