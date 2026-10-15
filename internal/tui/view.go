@@ -224,9 +224,10 @@ func (m *model) detailView(w int) string {
 // renderDiagnosisShort fits a diagnosis below the services.
 func (m *model) renderDiagnosisShort(d app.Diagnosis, w int) string {
 	s := m.styles
-	lines := []string{s.errText.Bold(true).Render(trunc(d.Problem, w))}
+	// Problem and hint wrap; they are the point. Output lines are cut, they are evidence.
+	lines := []string{s.errText.Bold(true).Width(w).Render(d.Problem)}
 	if d.Hint != "" {
-		lines = append(lines, s.accentText.Render(trunc("→ "+d.Hint, w)))
+		lines = append(lines, s.accentText.Width(w).Render("→ "+d.Hint))
 	}
 	if n := len(d.Health); n > 0 {
 		lines = append(lines, s.muted.Render("health check:"))
