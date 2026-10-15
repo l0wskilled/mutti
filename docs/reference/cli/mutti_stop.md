@@ -1,9 +1,9 @@
 ## mutti stop
 
-Stop the instance's containers, keep everything
+Stop the instance's containers, or some services', and keep everything
 
 ```
-mutti stop [flags]
+mutti stop [service...] [flags]
 ```
 
 ### Options

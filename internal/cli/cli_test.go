@@ -114,6 +114,18 @@ func TestLifecycleText(t *testing.T) {
 	if !strings.HasPrefix(out, "NAME  STATUS       BRANCH  URL") || !strings.Contains(out, "running 1/1") || !strings.Contains(out, "https://shop.localhost") || strings.Contains(out, "web:80=") {
 		t.Errorf("list: %q", out)
 	}
+	if out := w.mustRun("restart"); out != "shop is restarted.\n" {
+		t.Errorf("restart: %q", out)
+	}
+	if out := w.mustRun("stop", "web"); out != "shop: web stopped.\n" {
+		t.Errorf("stop web: %q", out)
+	}
+	if last := w.compose.Runs[len(w.compose.Runs)-1]; !slices.Equal(last, []string{"stop", "web"}) {
+		t.Errorf("stop web ran %v", last)
+	}
+	if out := w.mustRun("restart", "web"); out != "shop: web restarted.\n" {
+		t.Errorf("restart web: %q", out)
+	}
 	if out := w.mustRun("stop"); out != "shop is stopped.\n" {
 		t.Errorf("stop: %q", out)
 	}
@@ -941,7 +953,7 @@ func TestMCPServesOverTheCommandsStreams(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"down", "exec", "list", "logs", "run", "status", "stop", "up", "url", "worktree_add"}) {
+	if !slices.Equal(names, []string{"down", "exec", "list", "logs", "restart", "run", "status", "stop", "up", "url", "worktree_add"}) {
 		t.Errorf("tools %v", names)
 	}
 	if got := session.InitializeResult(); got != nil && got.ServerInfo.Version != "1.2.3" {

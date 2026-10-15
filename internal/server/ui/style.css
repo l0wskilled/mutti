@@ -243,7 +243,10 @@ a:hover { text-decoration: underline; }
 .dialog .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
 .btn svg { width: 0.95rem; height: 0.95rem; }
 .btn.sm { height: 1.7rem; padding: 0 0.6rem; font-size: 0.8rem; }
-.svc-head .btn.sm { margin-left: 0.5rem; }
+.svc-actions { display: inline-flex; gap: 0.35rem; margin-left: 0.5rem; }
+.btn.sm.icon { width: 1.7rem; padding: 0; }
+.btn.sm:disabled svg { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
 
 .icon-btn { display: grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }

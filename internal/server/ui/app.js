@@ -7,6 +7,7 @@ const icons = {
   open: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   play: '<svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg>',
   stop: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
   branch: '<svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9a6 6 0 0 1-6 6H6"/></svg>',
@@ -321,7 +322,8 @@ function badgeOf(svc) {
   if (/\(healthy\)/.test(svc.status)) return ["healthy", "healthy"];
   if (/\(unhealthy\)/.test(svc.status)) return ["unhealthy", "unhealthy"];
   if (/health: starting/.test(svc.status)) return ["starting", "starting"];
-  if (/^Exited \(0\)/.test(svc.status)) return ["completed", "done"];
+  if (svc.completed) return ["completed", "done"];
+  if (svc.state === "exited") return ["exited", "stopped"];
   return [svc.state, svc.state];
 }
 
@@ -350,7 +352,7 @@ function serviceCard(s, svc) {
       el("strong", { text: svc.service }),
       el("span", { class: `badge ${kind}`, text: label }),
       el("span", { class: "svc-status", text: svc.status }),
-      svc.profiles && svc.state !== "running" ? startButton(s, "service:" + svc.service, [svc.service]) : null,
+      el("span", { class: "svc-actions" }, ...(svc.state === "running" ? ["restart", "stop"] : ["up"]).map((action) => serviceButton(s, action, [svc.service]))),
     ),
     rows.length ? el("div", { class: "svc-rows" }, ...rows) : null,
   );
@@ -362,24 +364,40 @@ function profileHead(s, profile, services) {
     "div",
     { class: "profile-head" },
     el("div", {}, el("strong", { text: profile }), el("span", { class: "muted", text: "Optional, runs when started" })),
-    idle.length > 1 ? startButton(s, "profile:" + profile, idle, "Start all") : null,
+    idle.length > 1 ? serviceButton(s, "up", idle, "Start all") : null,
   );
 }
 
-// startButton starts the given optional services; key tells this button's work from others'.
-function startButton(s, key, services, text = "Start") {
+const serviceActions = {
+  up: { icon: "play", label: "Start", busy: "Starting", done: "started", fail: "start" },
+  stop: { icon: "stop", label: "Stop", busy: "Stopping", done: "stopped", fail: "stop" },
+  restart: { icon: "restart", label: "Restart", busy: "Restarting", done: "restarted", fail: "restart" },
+};
+
+// serviceButton runs an action on some services. With a text it is a labelled button, without
+// one an icon button that names the action in its tooltip.
+function serviceButton(s, action, services, text) {
+  const a = serviceActions[action];
+  const key = action + ":" + services.join(",");
   const busy = state.busy.get(s.path) === key;
-  return el("button", { class: "btn sm", disabled: busy, onclick: () => startServices(s, key, services) }, iconSpan("play"), el("span", { text: busy ? "Starting" : text }));
+  const label = `${a.label} ${services.join(", ")}`;
+  return el(
+    "button",
+    { class: text ? "btn sm" : "btn sm icon", title: label, "aria-label": label, disabled: busy, onclick: () => serviceAction(s, action, services, key) },
+    iconSpan(a.icon),
+    text ? el("span", { text: busy ? a.busy : text }) : null,
+  );
 }
 
-async function startServices(s, key, services) {
+async function serviceAction(s, action, services, key) {
+  const a = serviceActions[action];
   state.busy.set(s.path, key);
   loadServices();
   try {
-    await api(`/api/up?dir=${q(s.path)}${services.map((x) => "&service=" + q(x)).join("")}`, { method: "POST" });
-    toast("ok", `${services.join(", ")} started`);
+    await api(`/api/${action}?dir=${q(s.path)}${services.map((x) => "&service=" + q(x)).join("")}`, { method: "POST" });
+    toast("ok", `${services.join(", ")} ${a.done}`);
   } catch (err) {
-    toast("error", `Could not start ${services.join(", ")}`, err);
+    toast("error", `Could not ${a.fail} ${services.join(", ")}`, err);
   }
   state.busy.delete(s.path);
   await loadInstances();

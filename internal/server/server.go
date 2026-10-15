@@ -53,6 +53,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/doctor", s.doctor)
 	mux.HandleFunc("POST /api/up", s.lifecycle("up"))
 	mux.HandleFunc("POST /api/stop", s.lifecycle("stop"))
+	mux.HandleFunc("POST /api/restart", s.lifecycle("restart"))
 	mux.HandleFunc("POST /api/down", s.lifecycle("down"))
 	mcpServer := mcpserver.New(s.app, s.dir, s.version)
 	mux.Handle("/mcp", mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil))
@@ -220,17 +221,19 @@ func (s *Server) lifecycle(action string) http.HandlerFunc {
 			return
 		}
 		a, out := s.call()
+		// ?service= (repeatable) limits up, stop and restart to those services.
+		services := r.URL.Query()["service"]
 		var done Done
 		switch action {
 		case "up":
 			var res *app.UpResult
-			// ?service= (repeatable) starts only those services, an optional one among them.
-			if res, err = a.Up(r.Context(), dir, app.UpOptions{Services: r.URL.Query()["service"]}); err == nil {
+			if res, err = a.Up(r.Context(), dir, app.UpOptions{Services: services}); err == nil {
 				done.Instance, done.URL = res.Instance.Name, res.URL
 			}
-		case "stop":
+		case "stop", "restart":
+			run := map[string]func(*app.App, context.Context, string, app.Selection, ...string) (*app.Instance, error){"stop": (*app.App).Stop, "restart": (*app.App).Restart}[action]
 			var inst *app.Instance
-			if inst, err = a.Stop(r.Context(), dir, app.Selection{}); err == nil {
+			if inst, err = run(a, r.Context(), dir, app.Selection{}, services...); err == nil {
 				done.Instance = inst.Name
 			}
 		default:

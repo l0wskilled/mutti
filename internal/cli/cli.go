@@ -125,7 +125,7 @@ func newRoot(d Deps, p *printer) *cobra.Command {
 	})
 
 	builtins := []*cobra.Command{
-		initCmd(&d, p), upCmd(&d, p), stopCmd(&d, p), downCmd(&d, p), destroyCmd(&d, p),
+		initCmd(&d, p), upCmd(&d, p), stopCmd(&d, p), restartCmd(&d, p), downCmd(&d, p), destroyCmd(&d, p),
 		listCmd(&d, p), eventsCmd(&d, p), logsCmd(&d), execCmd(&d), composeCmd(&d),
 		tidyCmd(&d, p), renameCmd(&d, p), doctorCmd(&d, p), routerCmd(&d, p), trustCmd(&d, p), worktreeCmd(&d, p),
 		resetCmd(&d, p), urlCmd(&d, p), openCmd(&d, p), shellCmd(&d), statusCmd(&d, p), envCmd(&d, p), promptCmd(&d), attachCmd(&d, p), runCmd(&d, p), runIDCmd(&d), sweepCmd(&d, p), mcpCmd(&d), serveCmd(&d),
@@ -326,8 +326,38 @@ func simpleCmd(d *Deps, p *printer, use, short, done string, run func(context.Co
 	return c
 }
 
+// servicesCmd builds a command that acts on the instance or on some of its services.
+func servicesCmd(d *Deps, p *printer, use, short, done string, run func(context.Context, string, app.Selection, ...string) (*app.Instance, error)) *cobra.Command {
+	var sel app.Selection
+	c := &cobra.Command{
+		Use:               use + " [service...]",
+		Short:             short,
+		ValidArgsFunction: completeServices(d),
+		RunE: func(c *cobra.Command, args []string) error {
+			inst, err := run(c.Context(), d.Dir, sel, args...)
+			if err != nil {
+				return err
+			}
+			p.result(map[string]any{"instance": toJSON(inst), "services": args}, func(w io.Writer) {
+				if len(args) > 0 {
+					fmt.Fprintf(w, "%s: %s %s.\n", inst.Name, strings.Join(args, ", "), done)
+					return
+				}
+				fmt.Fprintf(w, "%s is %s.\n", inst.Name, done)
+			})
+			return nil
+		},
+	}
+	selectionFlags(c, &sel)
+	return c
+}
+
 func stopCmd(d *Deps, p *printer) *cobra.Command {
-	return simpleCmd(d, p, "stop", "Stop the instance's containers, keep everything", "is stopped", d.App.Stop)
+	return servicesCmd(d, p, "stop", "Stop the instance's containers, or some services', and keep everything", "stopped", d.App.Stop)
+}
+
+func restartCmd(d *Deps, p *printer) *cobra.Command {
+	return servicesCmd(d, p, "restart", "Restart the instance's containers, or some services'", "restarted", d.App.Restart)
 }
 
 func downCmd(d *Deps, p *printer) *cobra.Command {

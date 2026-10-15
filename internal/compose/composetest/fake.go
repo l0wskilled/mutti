@@ -140,9 +140,12 @@ func (f *Fake) Run(ctx context.Context, s compose.Spec, io compose.IO, args ...s
 			}
 		}
 		_, _ = f.Eng.CreateVolume(ctx, s.Project+"_data", map[string]string{engine.LabelComposeProject: s.Project, "com.docker.compose.volume": "data"})
-	case "stop":
+	case "stop", "restart":
+		state := map[string]string{"stop": "exited", "restart": "running"}[args[0]]
 		for _, c := range f.enabledContainers(ctx, s) {
-			f.Eng.SetContainerState(c.ID, "exited")
+			if named := args[1:]; len(named) == 0 || slices.Contains(named, c.Labels[engine.LabelComposeService]) {
+				f.Eng.SetContainerState(c.ID, state)
+			}
 		}
 	case "down":
 		for _, c := range f.enabledContainers(ctx, s) {

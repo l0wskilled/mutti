@@ -76,6 +76,12 @@ func TestAPI(t *testing.T) {
 	if _, logs, _ := call[Logs](t, http.MethodGet, ts.URL+"/api/logs"+dir+"&tail=5&service=web"); !strings.Contains(logs.Output, "--tail 5 web") {
 		t.Errorf("logs of one service %q", logs.Output)
 	}
+	if _, done, _ := call[Done](t, http.MethodPost, ts.URL+"/api/restart"+dir+"&service=web"); done.Instance != "shop" || !slices.Equal(w.Compose.Runs[len(w.Compose.Runs)-1], []string{"restart", "web"}) {
+		t.Errorf("restart web %+v", done)
+	}
+	if _, done, _ := call[Done](t, http.MethodPost, ts.URL+"/api/stop"+dir+"&service=web"); done.Instance != "shop" || !slices.Equal(w.Compose.Runs[len(w.Compose.Runs)-1], []string{"stop", "web"}) {
+		t.Errorf("stop web %+v", done)
+	}
 	if _, done, _ := call[Done](t, http.MethodPost, ts.URL+"/api/stop"+dir); done.Instance != "shop" {
 		t.Errorf("stop %+v", done)
 	}
@@ -119,7 +125,7 @@ func TestAPIErrors(t *testing.T) {
 			t.Errorf("%s outside a project: %d %+v", u, code, e)
 		}
 	}
-	for _, action := range []string{"up", "stop", "down"} {
+	for _, action := range []string{"up", "stop", "restart", "down"} {
 		if code, _, e := call[any](t, http.MethodPost, ts.URL+"/api/"+action+"?dir=relative"); code != http.StatusBadRequest || e.Code != "usage" {
 			t.Errorf("%s with a relative dir: %d %+v", action, code, e)
 		}

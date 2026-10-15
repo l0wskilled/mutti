@@ -271,3 +271,30 @@ func TestStatusListsOptionalServicesLast(t *testing.T) {
 		t.Errorf("services %v, want %v", got, want)
 	}
 }
+
+func TestStatusTellsCompletedOneShotsFromStoppedServices(t *testing.T) {
+	root := newRepo(t, "shop")
+	h := newHarness(t, &compose.Model{Services: map[string]compose.Service{"web": {}, "deps": {}, "db": {}}})
+	if _, err := h.app.Up(ctx, root, UpOptions{Services: []string{"web"}}); err != nil {
+		t.Fatal(err)
+	}
+	labels := func(service, dependsOn string) map[string]string {
+		return map[string]string{engine.LabelComposeProject: "shop", engine.LabelComposeService: service, labelDependsOn: dependsOn}
+	}
+	cs, _ := h.eng.ListContainers(ctx, engine.LabelComposeService+"=web")
+	_ = h.eng.RemoveContainer(ctx, cs[0].ID)
+	h.eng.AddContainer(engine.Container{State: "running", Labels: labels("web", "deps:service_completed_successfully:false")})
+	h.eng.AddContainer(engine.Container{State: "exited", Status: "Exited (0) 1 minute ago", Labels: labels("deps", "")})
+	h.eng.AddContainer(engine.Container{State: "exited", Status: "Exited (0) 1 minute ago", Labels: labels("db", "")})
+	st, err := h.app.Status(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, s := range st.Services {
+		got[s.Service] = s.Completed
+	}
+	if !got["deps"] || got["db"] || got["web"] {
+		t.Errorf("completed %v", got)
+	}
+}

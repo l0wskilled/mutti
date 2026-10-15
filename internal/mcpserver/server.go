@@ -35,7 +35,8 @@ func New(a *app.App, dir, version string) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{Name: "url", Description: "Return the HTTPS URL of the environment, or of one of its services.", Annotations: readOnly}, s.url)
 	mcp.AddTool(srv, &mcp.Tool{Name: "logs", Description: "Return the recent logs of the environment's services.", Annotations: readOnly}, s.logs)
 	mcp.AddTool(srv, &mcp.Tool{Name: "up", Description: "Start the environment of a worktree (or some of its services) and wait until it is healthy.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.up)
-	mcp.AddTool(srv, &mcp.Tool{Name: "stop", Description: "Stop the environment's containers; data and containers stay.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.stop)
+	mcp.AddTool(srv, &mcp.Tool{Name: "stop", Description: "Stop the environment's containers, or some services'; data and containers stay.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.stop)
+	mcp.AddTool(srv, &mcp.Tool{Name: "restart", Description: "Restart the environment's containers, or some services'.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true}}, s.restart)
 	mcp.AddTool(srv, &mcp.Tool{Name: "down", Description: "Remove the environment's containers and networks; its data stays.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &yes, IdempotentHint: true}}, s.down)
 	mcp.AddTool(srv, &mcp.Tool{Name: "exec", Description: "Run a command in a running service of the environment and return its output and exit code.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &yes}}, s.exec)
 	mcp.AddTool(srv, &mcp.Tool{Name: "run", Description: "Run a command, usually tests, against a throwaway copy of the environment with its own data; the copy is removed afterwards.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no}}, s.run)
@@ -203,9 +204,24 @@ type Done struct {
 	Instance string `json:"instance"`
 }
 
-func (s *server) stop(ctx context.Context, _ *mcp.CallToolRequest, in Where) (*mcp.CallToolResult, Done, error) {
+// ServicesInput names services of a worktree's environment.
+type ServicesInput struct {
+	Dir      string   `json:"dir,omitempty" jsonschema:"worktree directory, absolute or relative to where mutti mcp runs; default: that directory"`
+	Services []string `json:"services,omitempty" jsonschema:"only these services; default: all"`
+}
+
+func (s *server) stop(ctx context.Context, _ *mcp.CallToolRequest, in ServicesInput) (*mcp.CallToolResult, Done, error) {
+	return s.services(ctx, in, (*app.App).Stop)
+}
+
+func (s *server) restart(ctx context.Context, _ *mcp.CallToolRequest, in ServicesInput) (*mcp.CallToolResult, Done, error) {
+	return s.services(ctx, in, (*app.App).Restart)
+}
+
+// services runs a command on the environment's existing containers.
+func (s *server) services(ctx context.Context, in ServicesInput, run func(*app.App, context.Context, string, app.Selection, ...string) (*app.Instance, error)) (*mcp.CallToolResult, Done, error) {
 	a, out := s.call()
-	inst, err := a.Stop(ctx, s.resolve(in.Dir), app.Selection{})
+	inst, err := run(a, ctx, s.resolve(in.Dir), app.Selection{}, in.Services...)
 	if err != nil {
 		return nil, Done{}, toolErr(withOutput(err, out))
 	}

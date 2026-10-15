@@ -32,13 +32,14 @@ mutti runs one isolated copy of your Compose project per git worktree and cleans
 * [mutti prompt](mutti_prompt.md)	 - Print a short state line for your shell prompt (empty outside an instance)
 * [mutti rename](mutti_rename.md)	 - Give this worktree's instance a new name
 * [mutti reset](mutti_reset.md)	 - Delete the instance's data and start it fresh (bootstrap runs again)
+* [mutti restart](mutti_restart.md)	 - Restart the instance's containers, or some services'
 * [mutti router](mutti_router.md)	 - Manage the machine-wide router
 * [mutti run](mutti_run.md)	 - Run a command against a fresh throwaway instance, removed afterwards whatever happens
 * [mutti run-id](mutti_run-id.md)	 - Print a new run id (sortable, carries its time), for naming per-run resources
 * [mutti serve](mutti_serve.md)	 - Serve the web UI and HTTP API on 127.0.0.1 until interrupted
 * [mutti shell](mutti_shell.md)	 - Open a shell in a service (default: the main one), as your host user
 * [mutti status](mutti_status.md)	 - Show this worktree's instance service by service
-* [mutti stop](mutti_stop.md)	 - Stop the instance's containers, keep everything
+* [mutti stop](mutti_stop.md)	 - Stop the instance's containers, or some services', and keep everything
 * [mutti sweep](mutti_sweep.md)	 - Remove leftovers of old runs, and run this project's sweep hooks
 * [mutti tidy](mutti_tidy.md)	 - Remove instances whose worktree is gone, stop idle ones (shows them only, unless --yes)
 * [mutti trust](mutti_trust.md)	 - Make the system and browsers trust mutti's local CA (asks for sudo)

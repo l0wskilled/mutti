@@ -223,13 +223,24 @@ func (a *App) Up(ctx context.Context, dir string, opts UpOptions) (*UpResult, er
 	return res, nil
 }
 
-// Stop stops the instance's containers and keeps everything else.
-func (a *App) Stop(ctx context.Context, dir string, sel Selection) (*Instance, error) {
+// Stop stops the instance's containers, or only those of the given services, and keeps
+// everything else.
+func (a *App) Stop(ctx context.Context, dir string, sel Selection, services ...string) (*Instance, error) {
+	return a.serviceCommand(ctx, dir, sel, "stop", services)
+}
+
+// Restart restarts the instance's running containers, or those of the given services.
+func (a *App) Restart(ctx context.Context, dir string, sel Selection, services ...string) (*Instance, error) {
+	return a.serviceCommand(ctx, dir, sel, "restart", services)
+}
+
+// serviceCommand runs a Compose command that acts on existing containers, such as stop.
+func (a *App) serviceCommand(ctx context.Context, dir string, sel Selection, command string, services []string) (*Instance, error) {
 	inst, spec, err := a.resolvePrepared(ctx, dir, sel)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.compose(ctx, everyProfile(spec), "stop"); err != nil {
+	if err := a.compose(ctx, everyProfile(spec), append([]string{command}, services...)...); err != nil {
 		return nil, err
 	}
 	a.refreshRouter(ctx)

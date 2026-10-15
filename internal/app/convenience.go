@@ -87,6 +87,8 @@ type ServiceStatus struct {
 	Service string `json:"service"`
 	State   string `json:"state"`  // running, exited, ... or "missing" when not created
 	Status  string `json:"status"` // Docker's text, e.g. "Up 3 minutes (healthy)"
+	// Completed marks a one-shot service that did its job, such as installing dependencies.
+	Completed bool `json:"completed,omitempty"`
 	// Profiles are the Compose profiles of an optional service, which runs only when asked for.
 	Profiles []string      `json:"profiles,omitempty"`
 	URLs     []string      `json:"urls,omitempty"`
@@ -136,12 +138,13 @@ func (a *App) Status(ctx context.Context, dir string) (*InstanceStatus, error) {
 		}
 		byService[name] = ss
 	}
+	done := completed(containers)
 	for _, c := range containers {
 		ss := byService[c.Labels[engine.LabelComposeService]]
 		if ss == nil {
 			continue // orphan of an older configuration
 		}
-		ss.State, ss.Status = c.State, c.Status
+		ss.State, ss.Status, ss.Completed = c.State, c.Status, done[c.ID]
 		for _, p := range c.Ports {
 			ss.Ports = append(ss.Ports, PortSummary{Service: ss.Service, Address: fmt.Sprintf("%s:%d", p.HostIP, p.HostPort), ContainerPort: p.ContainerPort})
 		}
