@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -26,6 +27,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/mcpserver"
 	"github.com/l0wskilled/mutti/internal/project"
 	"github.com/l0wskilled/mutti/internal/server"
+	"github.com/l0wskilled/mutti/internal/tui"
 )
 
 // Deps are what the commands run against.
@@ -129,6 +131,7 @@ func newRoot(d Deps, p *printer) *cobra.Command {
 		listCmd(&d, p), eventsCmd(&d, p), logsCmd(&d), execCmd(&d), composeCmd(&d),
 		tidyCmd(&d, p), renameCmd(&d, p), doctorCmd(&d, p), routerCmd(&d, p), trustCmd(&d, p), worktreeCmd(&d, p),
 		resetCmd(&d, p), urlCmd(&d, p), openCmd(&d, p), shellCmd(&d), statusCmd(&d, p), diagnoseCmd(&d, p), envCmd(&d, p), promptCmd(&d), attachCmd(&d, p), runCmd(&d, p), runIDCmd(&d), sweepCmd(&d, p), mcpCmd(&d), serveCmd(&d),
+		tuiCmd(&d, func() []*cobra.Command { return root.Commands() }),
 	}
 	root.AddGroup(&cobra.Group{ID: "builtin", Title: "Commands:"}, &cobra.Group{ID: "custom", Title: "Project commands (.mutti/commands):"})
 	reserved := []string{"help", "completion"}
@@ -1250,6 +1253,39 @@ worktrees with environments of their own (worktree_add). Register it with your a
 
 // CodePortInUse means mutti serve cannot listen on its port.
 const CodePortInUse = "port-in-use"
+
+// runTUI starts the terminal UI and executable finds mutti's binary; tests replace them.
+var (
+	runTUI     = tui.Run
+	executable = os.Executable
+)
+
+// tuiHidden are the commands the terminal UI does not offer: they only make sense outside it.
+var tuiHidden = []string{"tui", "mcp", "help", "completion", "prompt"}
+
+func tuiCmd(d *Deps, commands func() []*cobra.Command) *cobra.Command {
+	return &cobra.Command{
+		Use:   "tui",
+		Short: "Every instance, its services and every mutti command in a terminal UI",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if !d.OutTTY {
+				return &app.Error{Code: CodeUsage, Message: "mutti tui needs a terminal", Hint: "for scripts, use mutti list --json and mutti status --json"}
+			}
+			self, err := executable()
+			if err != nil {
+				return err
+			}
+			opts := tui.Options{App: d.App, Dir: d.Dir, Self: self, Version: d.Version}
+			for _, cmd := range commands() {
+				if !cmd.Hidden && !slices.Contains(tuiHidden, cmd.Name()) {
+					opts.Commands = append(opts.Commands, tui.Command{Name: cmd.Name(), Use: cmd.Use, Short: cmd.Short})
+				}
+			}
+			return runTUI(c.Context(), opts, d.In, d.Out)
+		},
+	}
+}
 
 func serveCmd(d *Deps) *cobra.Command {
 	var port int

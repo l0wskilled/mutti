@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"go.yaml.in/yaml/v3"
 
@@ -37,6 +38,7 @@ type Fake struct {
 	Runs   [][]string
 	Specs  []compose.Spec
 	port   uint16
+	mu     sync.Mutex // Compose is run from several goroutines, e.g. by the terminal UI
 }
 
 // New returns a Fake that serves model for every spec.
@@ -58,11 +60,15 @@ func (f *Fake) BuildxVersion(context.Context) (string, error) {
 }
 
 func (f *Fake) Config(_ context.Context, s compose.Spec) (*compose.Model, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.Specs = append(f.Specs, s)
 	return f.ConfigFn(s)
 }
 
 func (f *Fake) Run(ctx context.Context, s compose.Spec, io compose.IO, args ...string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.Runs = append(f.Runs, args)
 	f.Specs = append(f.Specs, s)
 	if f.RunErr != nil {

@@ -44,6 +44,7 @@ mutti runs one isolated copy of your Compose project per git worktree and cleans
 * [mutti sweep](mutti_sweep.md)	 - Remove leftovers of old runs, and run this project's sweep hooks
 * [mutti tidy](mutti_tidy.md)	 - Remove instances whose worktree is gone, stop idle ones (shows them only, unless --yes)
 * [mutti trust](mutti_trust.md)	 - Make the system and browsers trust mutti's local CA (asks for sudo)
+* [mutti tui](mutti_tui.md)	 - Every instance, its services and every mutti command in a terminal UI
 * [mutti up](mutti_up.md)	 - Start this worktree's instance and wait until it is healthy
 * [mutti url](mutti_url.md)	 - Print the URL of the instance or of a service
 * [mutti worktree](mutti_worktree.md)	 - Create and remove git worktrees together with their instances

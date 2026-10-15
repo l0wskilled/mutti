@@ -386,9 +386,9 @@ func TestStopDownDestroyFailures(t *testing.T) {
 // withDir returns a copy of a whose Compose model is unreadable, so Resolve fails.
 func withDir(a *App) *App {
 	c := *a
-	fc := *a.Compose.(*composetest.Fake)
+	fc := composetest.New(a.Compose.(*composetest.Fake).Eng, nil)
 	fc.ConfigFn = func(compose.Spec) (*compose.Model, error) { return nil, errors.New("unreadable") }
-	c.Compose = &fc
+	c.Compose = fc
 	return &c
 }
 

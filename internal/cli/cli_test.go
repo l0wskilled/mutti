@@ -26,6 +26,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/engine/enginetest"
 	"github.com/l0wskilled/mutti/internal/gitdir"
+	"github.com/l0wskilled/mutti/internal/tui"
 	"github.com/l0wskilled/mutti/internal/xdg"
 )
 
@@ -1176,5 +1177,34 @@ func TestFailedUpExplainsWhatIsWrong(t *testing.T) {
 		if code, _, stderr := w.run(w.root, cmd); code == 0 || !strings.Contains(stderr, "! web: exited with 127: the command was not found") {
 			t.Errorf("%s: %d %q", cmd, code, stderr)
 		}
+	}
+}
+
+func TestTUICommand(t *testing.T) {
+	w := newWorld(t)
+	if code, _, stderr := w.run(w.root, "tui"); code != ExitError || !strings.Contains(stderr, "needs a terminal") {
+		t.Fatalf("no terminal: %d %q", code, stderr)
+	}
+	defer func(r func(context.Context, tui.Options, io.Reader, io.Writer) error, e func() (string, error)) {
+		runTUI, executable = r, e
+	}(runTUI, executable)
+	var got tui.Options
+	runTUI = func(_ context.Context, opts tui.Options, _ io.Reader, _ io.Writer) error { got = opts; return nil }
+	tty := func() int {
+		return Run(context.Background(), Deps{App: w.app, Dir: w.root, In: strings.NewReader(""), Out: io.Discard, Err: io.Discard, OutTTY: true}, []string{"tui"})
+	}
+	if code := tty(); code != 0 || got.Dir != w.root || got.Self == "" {
+		t.Fatalf("tui: %d %+v", code, got)
+	}
+	names := map[string]bool{}
+	for _, c := range got.Commands {
+		names[c.Name] = true
+	}
+	if !names["up"] || !names["worktree"] || names["tui"] || names["mcp"] || names["help"] {
+		t.Errorf("commands %v", names)
+	}
+	executable = func() (string, error) { return "", errors.New("no binary") }
+	if code := tty(); code != ExitError {
+		t.Errorf("no binary: %d", code)
 	}
 }

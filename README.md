@@ -92,6 +92,7 @@ its API on one origin, a full stack with database, hooks and tests, and project 
 | `mutti run -- <cmd>` | run a command against a throwaway instance, removed afterwards |
 | `mutti tidy` | remove instances of deleted worktrees, `--idle 24h` also stops unused ones; shows them first, acts with `--yes` |
 | `mutti doctor` | check Docker, Compose, router, HTTPS and this project |
+| `mutti tui` | all of the above in a terminal UI |
 
 Every command takes `--json` for scripts and tools; the format is versioned. The full reference
 is in [docs/reference/cli](docs/reference/cli/mutti.md).
@@ -160,6 +161,14 @@ in a container that should use the same router as mutti on the host needs the ho
 mount `~/.local/state/mutti` and `~/.local/share/mutti` to the same places in the container.
 Otherwise it refuses to touch the host's router; `MUTTI_ROUTER_NAME`, `MUTTI_HTTP_PORT` and
 `MUTTI_HTTPS_PORT` give it a router of its own.
+
+## Terminal UI
+
+`mutti tui` shows every instance on this machine, the services of the selected one and what is
+wrong with them, kept current as containers change. Keys act on the selected instance or service:
+start, stop, restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and
+destroy. `:` searches every mutti command, the project's own commands included, and runs it; `?`
+lists the keys.
 
 ## Web UI
 
