@@ -117,6 +117,7 @@ type model struct {
 	statusErr error
 	listErr   error
 	svcCursor int
+	marked    map[string]bool               // services the actions act on together
 	details   map[string]app.ServiceDetails // by service
 	usage     map[string]*usage             // by service, while it runs
 
@@ -137,13 +138,13 @@ type model struct {
 
 	viewer    viewport.Model // logs and diagnoses
 	viewTitle string
-	logsOf    string // service of the logs view, "" for all
+	logsOf    string // services of the logs view, space-separated, "" for all
 	follow    bool
 	logsGen   int
 }
 
 func newModel(ctx context.Context, opts Options) *model {
-	m := &model{ctx: ctx, opts: opts, styles: newStyles(true), keys: newKeyMap(), diags: map[string]app.Diagnosis{}, follow: true}
+	m := &model{ctx: ctx, opts: opts, styles: newStyles(true), keys: newKeyMap(), diags: map[string]app.Diagnosis{}, marked: map[string]bool{}, follow: true}
 	m.forgetDetails()
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.MiniDot))
 	m.input = textinput.New()
@@ -241,8 +242,12 @@ func (m *model) service() string {
 	return svcs[min(m.svcCursor, len(svcs)-1)].Service
 }
 
-// target names what an action acts on.
+// target names what an action acts on: the marked services, else the selected one, else the
+// instance.
 func (m *model) target() (string, []string) {
+	if marks := m.marks(); len(marks) > 0 && m.focus == paneServices {
+		return strings.Join(marks, ", "), marks
+	}
 	if s := m.service(); s != "" {
 		return s, []string{s}
 	}
@@ -399,7 +404,7 @@ func (m *model) gotInstances(msg instancesMsg) tea.Cmd {
 	if m.selected == "" && len(m.instances) > 0 {
 		m.selected = m.instances[0].Path
 	}
-	m.status, m.svcCursor = nil, 0
+	m.status, m.svcCursor, m.marked = nil, 0, map[string]bool{}
 	m.forgetDetails()
 	return tea.Batch(m.loadStatus(), m.loadDetails())
 }
@@ -478,6 +483,10 @@ func (m *model) mainKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.move(1)
 	case key.Matches(msg, k.Switch):
 		m.switchPane()
+	case key.Matches(msg, k.Mark):
+		m.toggleMark()
+	case msg.String() == "esc":
+		m.marked = map[string]bool{}
 	case key.Matches(msg, k.Filter):
 		m.mode, m.focus = modeFilter, paneInstances
 		return m.filter.Focus()
@@ -513,10 +522,35 @@ func (m *model) move(by int) tea.Cmd {
 	return m.selectInstance(shown[(i+by+n)%n].Path)
 }
 
+// marks are the marked services in the order of the services pane.
+func (m *model) marks() []string {
+	var out []string
+	for _, svc := range m.services() {
+		if m.marked[svc.Service] {
+			out = append(out, svc.Service)
+		}
+	}
+	return out
+}
+
+// toggleMark marks the service under the cursor, or unmarks it, and moves on.
+func (m *model) toggleMark() {
+	svc := m.service()
+	if svc == "" {
+		return
+	}
+	if m.marked[svc] {
+		delete(m.marked, svc)
+	} else {
+		m.marked[svc] = true
+	}
+	m.move(1)
+}
+
 // selectInstance shows the instance at path, its status and details loaded anew.
 func (m *model) selectInstance(path string) tea.Cmd {
 	m.selected = path
-	m.status, m.statusErr, m.svcCursor, m.diags = nil, nil, 0, map[string]app.Diagnosis{}
+	m.status, m.statusErr, m.svcCursor, m.diags, m.marked = nil, nil, 0, map[string]app.Diagnosis{}, map[string]bool{}
 	m.forgetDetails()
 	return tea.Batch(m.loadStatus(), m.loadDetails())
 }

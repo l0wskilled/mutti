@@ -138,7 +138,7 @@ func (m *model) actions() []action {
 			}
 		})},
 		{k.Logs, "Logs", "follow the logs of the instance or the selected service", needWorktree(func() tea.Cmd {
-			m.logsOf = m.service()
+			m.logsOf = strings.Join(services, " ")
 			m.logsGen++
 			m.openViewer(modeLogs, "Logs of "+what, "loading…")
 			return tea.Batch(m.loadLogs(), m.logsTick())
@@ -328,9 +328,7 @@ func (m *model) loadLogs() tea.Cmd {
 	a, out := m.app()
 	return func() tea.Msg {
 		args := []string{"logs", "--no-color", "--timestamps", "--tail", fmt.Sprint(logLines)}
-		if svc != "" {
-			args = append(args, svc)
-		}
+		args = append(args, strings.Fields(svc)...)
 		_, _ = a.ComposePassthrough(m.ctx, path, app.Selection{}, args)
 		return logsMsg{path: path, service: svc, text: out.String()}
 	}

@@ -193,10 +193,14 @@ func (m *model) servicesView(w int) string {
 			lines = append(lines, "", s.muted.Render("profile "+p+" · optional"))
 		}
 		kind, word := badge(svc)
-		marker, name := "  ", svc.Service
+		cursor, mark, name := " ", " ", svc.Service
 		if m.focus == paneServices && i == m.svcCursor {
-			marker, name = s.cursor.Render("› "), s.selectedRow.Render(svc.Service)
+			cursor, name = "›", s.selectedRow.Render(svc.Service)
 		}
+		if m.marked[svc.Service] {
+			mark = "✓"
+		}
+		marker := s.cursor.Render(cursor+mark) + " "
 		row := fmt.Sprintf("%s%s  %s  %s%s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), s.badge(kind).Render(fmt.Sprintf("%-10s", word)), m.usageColumns(svc.Service, w), s.faintText.Render(svc.Status))
 		if _, sick := m.diags[svc.Service]; sick {
 			row += s.errText.Render("  !")
@@ -228,6 +232,9 @@ func (m *model) usageColumns(service string, w int) string {
 // detailView tells about the selected service, or what needs care.
 func (m *model) detailView(w int) string {
 	s := m.styles
+	if marks := m.marks(); len(marks) > 0 && m.focus == paneServices {
+		return s.accentText.Render(fmt.Sprintf("%d marked", len(marks))) + s.muted.Render(" · u/s/r, l and i act on them · esc unmarks")
+	}
 	svc := m.service()
 	if svc == "" {
 		if n := len(m.diags); n > 0 {
