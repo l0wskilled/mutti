@@ -27,7 +27,7 @@ func (m *model) render() string {
 	h := max(m.height-lipgloss.Height(header)-lipgloss.Height(footer), 3)
 	var body string
 	switch m.mode {
-	case modeMain:
+	case modeMain, modeFilter:
 		body = m.mainView(h)
 	case modeLogs, modeDiagnose:
 		body = m.viewerView(h)
@@ -107,7 +107,7 @@ func (m *model) withCheatSheet(instances string, h int) string {
 		"  " + k("d", "down") + "  " + k("R", "reset") + "  " + k("X", "destroy"),
 		"  " + k("n", "new worktree") + "  " + k("T", "tidy"),
 		s.faintText.Render("everything else"),
-		"  " + k(":", "search every mutti command"),
+		"  " + k(":", "search every mutti command") + "  " + k("/", "filter"),
 		"  " + k("?", "help"),
 	}
 	free := h - lipgloss.Height(instances) - len(sheet)
@@ -132,7 +132,15 @@ func (m *model) welcome() string {
 func (m *model) instancesView(w int) string {
 	s := m.styles
 	lines := []string{s.muted.Render("INSTANCES"), ""}
-	for _, i := range m.instances {
+	shown := m.shown()
+	if m.mode == modeFilter || m.filter.Value() != "" {
+		count := s.faintText.Render(fmt.Sprintf("%d of %d", len(shown), len(m.instances)))
+		lines[1] = padBetween(trunc(m.filter.View(), w-lipgloss.Width(count)-1), count, w)
+		if len(shown) == 0 {
+			lines = append(lines, s.muted.Render("nothing matches · esc shows all"))
+		}
+	}
+	for _, i := range shown {
 		marker, name := "  ", s.title.Render(i.Name)
 		if i.Path == m.selected {
 			marker = s.cursor.Render("› ")

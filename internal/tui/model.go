@@ -24,6 +24,7 @@ type mode int
 const (
 	modeMain mode = iota
 	modePalette
+	modeFilter
 	modePrompt
 	modeConfirm
 	modeLogs
@@ -109,7 +110,8 @@ type model struct {
 	focus  pane
 
 	instances []app.Summary
-	selected  string // path of the selected instance
+	filter    textinput.Model // narrows the instances to those it matches
+	selected  string          // path of the selected instance
 	status    *app.InstanceStatus
 	diags     map[string]app.Diagnosis
 	statusErr error
@@ -146,6 +148,9 @@ func newModel(ctx context.Context, opts Options) *model {
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.MiniDot))
 	m.input = textinput.New()
 	m.input.Prompt = "› "
+	m.filter = textinput.New()
+	m.filter.Prompt = "/ "
+	m.filter.Placeholder = "name or branch"
 	m.help = help.New()
 	m.viewer = viewport.New()
 	m.viewer.SoftWrap = true
@@ -358,6 +363,8 @@ func (m *model) forward(msg tea.Msg) tea.Cmd {
 		m.palette, cmd = m.palette.Update(msg)
 	case modePrompt:
 		m.input, cmd = m.input.Update(msg)
+	case modeFilter:
+		m.filter, cmd = m.filter.Update(msg)
 	case modeLogs, modeDiagnose:
 		m.viewer, cmd = m.viewer.Update(msg)
 	}
@@ -443,6 +450,8 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.paletteKey(msg)
 	case modePrompt:
 		return m.promptKey(msg)
+	case modeFilter:
+		return m.filterKey(msg)
 	case modeConfirm:
 		m.mode = modeMain
 		if msg.String() == "y" || msg.String() == "Y" {
@@ -469,6 +478,9 @@ func (m *model) mainKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.move(1)
 	case key.Matches(msg, k.Switch):
 		m.switchPane()
+	case key.Matches(msg, k.Filter):
+		m.mode, m.focus = modeFilter, paneInstances
+		return m.filter.Focus()
 	case key.Matches(msg, k.Enter):
 		return m.enter()
 	case key.Matches(msg, k.Palette):
@@ -492,15 +504,62 @@ func (m *model) move(by int) tea.Cmd {
 		}
 		return nil
 	}
-	n := len(m.instances)
+	shown := m.shown()
+	n := len(shown)
 	if n == 0 {
 		return nil
 	}
-	i := slices.IndexFunc(m.instances, func(s app.Summary) bool { return s.Path == m.selected })
-	m.selected = m.instances[(i+by+n)%n].Path
+	i := slices.IndexFunc(shown, func(s app.Summary) bool { return s.Path == m.selected })
+	return m.selectInstance(shown[(i+by+n)%n].Path)
+}
+
+// selectInstance shows the instance at path, its status and details loaded anew.
+func (m *model) selectInstance(path string) tea.Cmd {
+	m.selected = path
 	m.status, m.statusErr, m.svcCursor, m.diags = nil, nil, 0, map[string]app.Diagnosis{}
 	m.forgetDetails()
 	return tea.Batch(m.loadStatus(), m.loadDetails())
+}
+
+// shown are the instances the filter matches: those with every word of it in their name or
+// branch.
+func (m *model) shown() []app.Summary {
+	words := strings.Fields(strings.ToLower(m.filter.Value()))
+	var out []app.Summary
+	for _, s := range m.instances {
+		text := strings.ToLower(s.Name + " " + s.Branch)
+		if !slices.ContainsFunc(words, func(w string) bool { return !strings.Contains(text, w) }) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// filterKey edits the filter: enter keeps it, esc drops it, the arrows move through what it
+// matches. The first match is selected when the selected instance no longer is one.
+func (m *model) filterKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "esc":
+		m.filter.SetValue("")
+		m.filter.Blur()
+		m.mode = modeMain
+		return nil
+	case "enter":
+		m.filter.Blur()
+		m.mode = modeMain
+		return nil
+	case "up":
+		return m.move(-1)
+	case "down":
+		return m.move(1)
+	}
+	var cmd tea.Cmd
+	m.filter, cmd = m.filter.Update(msg)
+	shown := m.shown()
+	if len(shown) == 0 || slices.ContainsFunc(shown, func(s app.Summary) bool { return s.Path == m.selected }) {
+		return cmd
+	}
+	return tea.Batch(cmd, m.selectInstance(shown[0].Path))
 }
 
 func (m *model) switchPane() {

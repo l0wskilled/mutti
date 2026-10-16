@@ -4,7 +4,7 @@ import "charm.land/bubbles/v2/key"
 
 // keyMap is every key of the main view; it doubles as the help.
 type keyMap struct {
-	Up, Down, Switch, Enter                           key.Binding
+	Up, Down, Switch, Enter, Filter                   key.Binding
 	Start, Stop, Restart, Down2, Destroy, Reset, Tidy key.Binding
 	Open, Copy, Logs, Diagnose, Exec, Worktree        key.Binding
 	Palette, Help, Quit                               key.Binding
@@ -19,6 +19,7 @@ func newKeyMap() keyMap {
 		Down:     b([]string{"down", "j"}, "↓/j", "down"),
 		Switch:   b([]string{"tab", "left", "right", "h"}, "tab", "instances ⇄ services"),
 		Enter:    b([]string{"enter"}, "enter", "services / shell"),
+		Filter:   b([]string{"/"}, "/", "filter instances"),
 		Start:    b([]string{"u"}, "u", "start"),
 		Stop:     b([]string{"s"}, "s", "stop"),
 		Restart:  b([]string{"r"}, "r", "restart"),
@@ -46,7 +47,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 // FullHelp is the help overlay, by topic.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Switch, k.Enter, k.Palette, k.Help, k.Quit},
+		{k.Up, k.Down, k.Switch, k.Enter, k.Filter, k.Palette, k.Help, k.Quit},
 		{k.Start, k.Stop, k.Restart, k.Down2, k.Reset, k.Destroy, k.Tidy},
 		{k.Open, k.Copy, k.Logs, k.Diagnose, k.Exec, k.Worktree},
 	}
