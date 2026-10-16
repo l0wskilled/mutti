@@ -174,7 +174,7 @@ func TestNavigationAndServiceDetails(t *testing.T) {
 		t.Fatalf("tab: %v %q", w.m.focus, w.m.service())
 	}
 	press(w.m, "down", "up", "k", "j")
-	if w.m.svcCursor != 0 || !strings.Contains(w.screen(), "tab instances • space mark • u start") {
+	if w.m.svcCursor != 0 || !strings.Contains(w.screen(), "tab instances • space mark • u up") {
 		t.Errorf("services: %d\n%s", w.m.svcCursor, w.screen())
 	}
 	if cmd := press(w.m, "enter"); cmd == nil {
@@ -230,7 +230,7 @@ func TestEmptyMachineAndNoInstance(t *testing.T) {
 	w.m.move(1)
 	w.m.instances = []app.Summary{{Name: "x", Path: "/x"}}
 	w.m.selected = "/gone"
-	if !strings.Contains(w.screen(), "Select an instance.") {
+	if !strings.Contains(w.screen(), "No instance selected.") {
 		t.Errorf("no current:\n%s", w.screen())
 	}
 	// A failing list shows up in the header and keeps what was there.
@@ -331,7 +331,7 @@ func TestFailedActionShowsWhatWentWrong(t *testing.T) {
 	if w.m.mode != modeDiagnose || diag.diags[0].Service != "mutti" || !strings.Contains(w.screen(), "port is already allocated") {
 		t.Errorf("what went wrong:\n%s", w.screen())
 	}
-	if !strings.Contains(w.screen(), "↑/↓ scroll · esc back") {
+	if !strings.Contains(w.screen(), "↑/↓ scroll • esc back") {
 		t.Error("viewer hint")
 	}
 	press(w.m, "esc")
@@ -445,7 +445,7 @@ func TestDiagnosis(t *testing.T) {
 	w.App.Reconcile(context.Background()) //nolint:errcheck // only the model matters
 	feed[statusMsg](t, w.m, w.m.refresh())
 	screen := w.screen()
-	if !strings.Contains(screen, "1 service needs care") || !strings.Contains(screen, "profile tools · optional") || !strings.Contains(screen, "unhealthy") {
+	if !strings.Contains(screen, "needs care") || !strings.Contains(screen, "── tools · optional") || !strings.Contains(screen, "unhealthy") {
 		t.Fatalf("status with trouble:\n%s", screen)
 	}
 	press(w.m, "tab")
@@ -489,7 +489,7 @@ func TestBadges(t *testing.T) {
 		}
 	}
 	s := newStyles(false)
-	if s.badge("whatever").Render("x") == "" || s.dot("whatever") == "" || statusWord(app.StatusPartial) != "partly running" {
+	if s.badge("whatever").Render("x") == "" || s.dotColor("whatever") != s.faint || statusWord(app.StatusPartial) != "partly running" {
 		t.Error("styles")
 	}
 }
@@ -529,7 +529,7 @@ func TestPrompts(t *testing.T) {
 func TestPalette(t *testing.T) {
 	w := setup(t)
 	press(w.m, ":")
-	if w.m.mode != modePalette || !strings.Contains(w.screen(), "Start") || !strings.Contains(w.screen(), "What do you want to do? ›") {
+	if w.m.mode != modePalette || !strings.Contains(w.screen(), "Up") || !strings.Contains(w.screen(), "What do you want to do? ›") {
 		t.Fatalf("palette:\n%s", w.screen())
 	}
 	typeIn(w.m, "l", "i", "s", "t")
@@ -557,7 +557,7 @@ func TestPalette(t *testing.T) {
 	press(w.m, "tab", ":")
 	press(w.m, "enter")
 	if w.m.busy == "" {
-		t.Error("the first entry is Start")
+		t.Error("the first entry is Up")
 	}
 	w.m.busy = ""
 	press(w.m, ":")
@@ -703,7 +703,7 @@ func TestEventsRefresh(t *testing.T) {
 func TestOrphanedAndCareInHeader(t *testing.T) {
 	w := setup(t)
 	w.m.instances = append(w.m.instances, app.Summary{Name: "gone", Path: "/gone", Status: app.StatusPartial, Orphaned: true})
-	if !strings.Contains(w.screen(), "1 need care") || !strings.Contains(w.screen(), "worktree gone · mutti tidy") {
+	if !strings.Contains(w.screen(), "1 need care") || !strings.Contains(w.screen(), "worktree gone") {
 		t.Errorf("care:\n%s", w.screen())
 	}
 	if padBetween("a", "b", 1) != "a b" || clip("a\nb", 1) != "a" || lastLines("a\nb\nc", 2) != "b\nc" || trunc("abc", -1) != "" {
@@ -751,7 +751,7 @@ func TestGoneWorktree(t *testing.T) {
 	if c := w.m.current(); c == nil || !c.Orphaned {
 		t.Fatalf("orphaned: %+v", c)
 	}
-	if s := w.screen(); !strings.Contains(s, "Its worktree is gone.") || !strings.Contains(s, "X removes them") {
+	if s := w.screen(); !strings.Contains(s, "The worktree is gone.") || !strings.Contains(s, "X removes them") {
 		t.Errorf("gone:\n%s", s)
 	}
 	if press(w.m, "u"); !strings.Contains(w.m.toast, "the worktree of shop is gone: X removes what is left") {

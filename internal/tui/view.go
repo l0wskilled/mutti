@@ -51,10 +51,13 @@ func (m *model) header() string {
 		}
 	}
 	summary := fmt.Sprintf("%d instances · %d running", len(m.instances), running)
+	if m.narrow() {
+		summary = fmt.Sprintf("%d/%d running", running, len(m.instances))
+	}
 	if care > 0 {
 		summary += s.errText.Render(fmt.Sprintf(" · %d need care", care))
 	}
-	left := " " + s.brand.Render("◆ mutti") + s.faintText.Render(" "+m.opts.Version) + "   " + s.muted.Render(summary) + "   " + m.health()
+	left := " " + s.brand.Render("◆ mutti") + s.faintText.Render(" "+strings.TrimSuffix(m.opts.Version, " (none)")) + "   " + s.muted.Render(summary) + "   " + m.health()
 	right := ""
 	switch {
 	case m.busy != "":
@@ -98,33 +101,6 @@ func lastWord(detail string) string {
 	return detail
 }
 
-func (m *model) footer() string {
-	return " " + m.help.ShortHelpView(m.keys.footer(m.focus, len(m.marks()) > 0))
-}
-
-func (m *model) mainView(h int) string {
-	switch {
-	case len(m.instances) == 0 && m.listErr != nil:
-		return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, m.listFailed())
-	case len(m.instances) == 0:
-		return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, m.welcome())
-	}
-	lw := min(max(m.width/3, 28), 44)
-	rw := m.width - lw
-	m.split = lw
-	left, right := m.styles.pane, m.styles.pane
-	if m.focus == paneInstances {
-		left = m.styles.focusedPane
-	} else {
-		right = m.styles.focusedPane
-	}
-	// Width and height count the border.
-	return lipgloss.JoinHorizontal(lipgloss.Top,
-		left.Width(lw).Height(h).Render(clip(m.instancesView(lw-4), h-2)),
-		right.Width(rw).Height(h).Render(clip(m.servicesView(rw-4), h-2)),
-	)
-}
-
 // dockerDown reports whether err says that Docker does not answer.
 func dockerDown(err error) bool {
 	var e *app.Error
@@ -156,154 +132,6 @@ func (m *model) welcome() string {
 	}, "\n"))
 }
 
-func (m *model) instancesView(w int) string {
-	s := m.styles
-	lines := []string{m.paneTitle("INSTANCES", paneInstances), ""}
-	shown := m.shown()
-	m.instanceAt = map[int]string{}
-	if m.mode == modeFilter || m.filter.Value() != "" {
-		count := s.faintText.Render(fmt.Sprintf("%d of %d", len(shown), len(m.instances)))
-		lines[1] = padBetween(trunc(m.filter.View(), w-lipgloss.Width(count)-1), count, w)
-		if len(shown) == 0 {
-			lines = append(lines, s.muted.Render("nothing matches · esc shows all"))
-		}
-	}
-	for _, i := range shown {
-		marker, name := "  ", s.title.Render(i.Name)
-		if i.Path == m.selected {
-			marker, name = s.cursor.Render("› "), s.cursor.Render(i.Name)
-			if m.focus != paneInstances { // the services have the keys
-				marker, name = s.muted.Render("› "), s.selectedRow.Render(i.Name)
-			}
-		}
-		count := s.muted.Render(fmt.Sprintf("%d/%d", i.Running, i.Total))
-		first := marker + s.dot(i.Status) + " " + name
-		m.instanceAt[len(lines)], m.instanceAt[len(lines)+1] = i.Path, i.Path
-		lines = append(lines, padBetween(trunc(first, w-lipgloss.Width(count)-1), count, w))
-		detail := i.Branch
-		if i.Orphaned {
-			detail = s.errText.Render("worktree gone · mutti tidy")
-		}
-		lines = append(lines, "    "+s.faintText.Render(trunc(detail, w-4)))
-	}
-	return strings.Join(lines, "\n")
-}
-
-// paneTitle is the title of a pane, in the accent color while the pane has the keys.
-func (m *model) paneTitle(title string, p pane) string {
-	if m.focus == p {
-		return m.styles.key.Render(title)
-	}
-	return m.styles.muted.Render(title)
-}
-
-func (m *model) servicesView(w int) string {
-	s := m.styles
-	c := m.current()
-	if c == nil {
-		return s.muted.Render("Select an instance.")
-	}
-	lines := []string{s.title.Render(c.Name) + "  " + s.muted.Render(statusWord(c.Status))}
-	if len(c.URLs) > 0 {
-		lines = append(lines, s.accentText.Render(trunc(c.URLs[0], w)))
-	}
-	lines = append(lines, s.faintText.Render(trunc(c.Path, w)), "")
-	switch {
-	case c.Orphaned:
-		return strings.Join(append(lines,
-			s.errText.Render("Its worktree is gone."),
-			s.muted.Width(w).Render("Its containers, networks and data are left over."),
-			"",
-			s.key.Render("X")+s.muted.Render(" removes them · ")+s.key.Render("T")+s.muted.Render(" tidies every deleted worktree")), "\n")
-	case m.statusErr != nil:
-		return strings.Join(append(lines, s.errText.Width(w).Render(m.statusErr.Error())), "\n")
-	case m.status == nil:
-		return strings.Join(append(lines, s.muted.Render(m.spinner.View()+" loading…")), "\n")
-	}
-	lines = append(lines, m.paneTitle("SERVICES", paneServices))
-	svcs := m.services()
-	m.serviceAt = map[int]int{}
-	nameW := 0
-	for _, svc := range svcs {
-		nameW = max(nameW, len(svc.Service))
-	}
-	group := ""
-	for i, svc := range svcs {
-		if p := firstProfile(svc); p != group {
-			group = p
-			lines = append(lines, "", s.muted.Render("profile "+p+" · optional"))
-		}
-		kind, word := badge(svc)
-		cursor, mark, name := " ", " ", svc.Service
-		if m.focus == paneServices && i == m.svcCursor {
-			cursor, name = "›", s.selectedRow.Render(svc.Service)
-		}
-		if m.marked[svc.Service] {
-			mark = "✓"
-		}
-		marker := s.cursor.Render(cursor+mark) + " "
-		row := fmt.Sprintf("%s%s  %s  %s%s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), m.badgeStyle(kind).Render(fmt.Sprintf("%-12s", m.badgeWord(kind, word))), m.usageColumns(svc.Service, w), s.faintText.Render(svc.Status))
-		if _, sick := m.diags[svc.Service]; sick {
-			row += s.errText.Render("  !")
-		}
-		m.serviceAt[len(lines)] = i
-		lines = append(lines, trunc(row, w))
-	}
-	lines = append(lines, "", m.detailView(w))
-	return strings.Join(lines, "\n")
-}
-
-// usageColumns are the CPU and memory of a running service in its row, blank for the others so
-// the columns line up. Narrow panes leave them out.
-func (m *model) usageColumns(service string, w int) string {
-	const width = 6 + 1 + 8 + 2 + 5 + 2
-	if w < 70 || len(m.usage) == 0 {
-		return ""
-	}
-	u := m.usage[service]
-	if u == nil {
-		return strings.Repeat(" ", width)
-	}
-	cpu := strings.Repeat(" ", 6+1+8)
-	if len(u.cpu) > 0 {
-		cpu = fmt.Sprintf("%5.1f%% ", last(u.cpu)) + m.styles.accentText.Render(cpuLine(u.cpu, 8))
-	}
-	return cpu + "  " + m.styles.muted.Render(fmt.Sprintf("%5s", humanBytes(last(u.mem)))) + "  "
-}
-
-// detailView tells about the selected service, or what needs care.
-func (m *model) detailView(w int) string {
-	s := m.styles
-	if marks := m.marks(); len(marks) > 0 && m.focus == paneServices {
-		return s.accentText.Render(fmt.Sprintf("%d marked", len(marks)))
-	}
-	svc := m.service()
-	if svc == "" {
-		if n := len(m.diags); n == 1 {
-			return s.errText.Render("1 service needs care")
-		} else if n > 1 {
-			return s.errText.Render(fmt.Sprintf("%d services need care", n))
-		}
-		return ""
-	}
-	lines := m.facts(svc)
-	if d, ok := m.diags[svc]; ok {
-		return strings.Join(append(lines, "", s.diag.Width(w).Render(m.renderDiagnosisShort(d, w-2))), "\n")
-	}
-	for _, st := range m.services() {
-		if st.Service != svc {
-			continue
-		}
-		for _, u := range st.URLs {
-			lines = append(lines, s.muted.Render(fmt.Sprintf("%-7s", "url"))+s.accentText.Render(u))
-		}
-		for _, p := range st.Ports {
-			lines = append(lines, s.muted.Render(fmt.Sprintf("%-7s%d → ", "port", p.ContainerPort))+p.Address)
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
 // facts are what the selected service runs, since when and what it uses.
 func (m *model) facts(svc string) []string {
 	s := m.styles
@@ -321,7 +149,7 @@ func (m *model) facts(svc string) []string {
 		}
 		lines = append(lines, up)
 	}
-	if h := d.Health; h != nil {
+	if h := d.Health; h != nil && u != nil { // a stopped one's last check is old news
 		state := s.okText.Render("passing")
 		if h.ExitCode != 0 {
 			state = s.errText.Render(fmt.Sprintf("failing, exit %d", h.ExitCode))
@@ -362,21 +190,6 @@ func (m *model) renderDiagnosisShort(d app.Diagnosis, w int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *model) viewerView(h int) string {
-	s := m.styles
-	hint := "↑/↓ scroll · esc back"
-	if m.mode == modeLogs {
-		follow := "off"
-		if m.follow {
-			follow = "on"
-		}
-		hint = "↑/↓ scroll · f follow (" + follow + ") · esc back"
-	}
-	title := " " + s.title.Render(m.viewTitle) + "  " + s.muted.Render(hint)
-	m.viewer.SetHeight(max(h-2, 1))
-	return lipgloss.JoinVertical(lipgloss.Left, title, s.pane.Width(m.width).Render(m.viewer.View()))
-}
-
 func (m *model) overlay() string {
 	s := m.styles
 	switch m.mode {
@@ -393,10 +206,12 @@ func (m *model) overlay() string {
 	return s.overlay.Render(uwu(s))
 }
 
-// badge is the kind and word of a service's state.
+// badge is the kind and word of a service's state. An optional service that is not running is
+// off, unless it crashed.
 func badge(svc app.ServiceStatus) (string, string) {
+	optional := len(svc.Profiles) > 0
 	switch {
-	case len(svc.Profiles) > 0 && svc.State != "running":
+	case svc.State == "missing" && optional:
 		return "off", "off"
 	case svc.State == "missing":
 		return "missing", "not created"
@@ -408,11 +223,12 @@ func badge(svc app.ServiceStatus) (string, string) {
 		return "starting", "starting"
 	case svc.Completed:
 		return "done", "done"
-	case svc.State == "exited":
-		if strings.HasPrefix(svc.Status, "Exited (0)") || strings.HasPrefix(svc.Status, "Exited (143)") {
-			return "stopped", "stopped"
-		}
+	case svc.State == "exited" && !strings.HasPrefix(svc.Status, "Exited (0)") && !strings.HasPrefix(svc.Status, "Exited (143)"):
 		return "crashed", "crashed"
+	case optional && svc.State != "running":
+		return "off", "off"
+	case svc.State == "exited":
+		return "stopped", "stopped"
 	}
 	return svc.State, svc.State
 }

@@ -55,7 +55,7 @@ func (m *model) actions() []action {
 		})
 	}
 	return []action{
-		{k.Start, "Start", "start the instance, or the selected service", needWorktree(func() tea.Cmd {
+		{k.Start, "Up", "start the instance, or the selected service, creating what is missing", needWorktree(func() tea.Cmd {
 			return m.act("starting "+what, func(a *app.App) (string, error) {
 				res, err := a.Up(m.ctx, path, app.UpOptions{Services: services})
 				if err != nil {

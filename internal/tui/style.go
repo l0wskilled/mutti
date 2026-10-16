@@ -8,7 +8,7 @@ import (
 
 // styles are the looks of the UI, in the colors of the web UI, for a light or a dark terminal.
 type styles struct {
-	accent, green, amber, red, text, dim, faint, border color.Color
+	accent, green, amber, red, text, dim, faint, border, sel color.Color
 
 	title, muted, faintText, accentText, key, errText, okText lipgloss.Style
 	pane, focusedPane, overlay, diag, code                    lipgloss.Style
@@ -27,6 +27,7 @@ func newStyles(dark bool) styles {
 		dim:    pick(lipgloss.Color("#5b6170"), lipgloss.Color("#a3a9b6")),
 		faint:  pick(lipgloss.Color("#8b91a0"), lipgloss.Color("#6f7685")),
 		border: pick(lipgloss.Color("#d5d9e0"), lipgloss.Color("#2a2e37")),
+		sel:    pick(lipgloss.Color("#ebe9fe"), lipgloss.Color("#272640")),
 	}
 	s.title = lipgloss.NewStyle().Bold(true).Foreground(s.text)
 	s.muted = lipgloss.NewStyle().Foreground(s.dim)
@@ -59,13 +60,12 @@ func (s styles) badge(kind string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(c)
 }
 
-// dot is the colored status dot of an instance.
-func (s styles) dot(status string) string {
-	c := map[string]color.Color{"running": s.green, "partial": s.amber, "stopped": s.faint, "down": s.faint}[status]
-	if c == nil {
-		c = s.faint
+// dotColor is the color of an instance's status dot.
+func (s styles) dotColor(status string) color.Color {
+	if c := map[string]color.Color{"running": s.green, "partial": s.amber}[status]; c != nil {
+		return c
 	}
-	return lipgloss.NewStyle().Foreground(c).Render("●")
+	return s.faint
 }
 
 // renderLogo writes "mutti" in a gradient.

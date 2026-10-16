@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/l0wskilled/mutti/internal/app"
 	"github.com/l0wskilled/mutti/internal/engine"
 )
 
@@ -86,18 +89,21 @@ func TestServiceFactsAndUsage(t *testing.T) {
 
 func TestUsageColumns(t *testing.T) {
 	w := setup(t)
-	if w.m.usageColumns("web", 100) != "" {
+	if w.m.showUsage(100) {
 		t.Error("nothing sampled yet")
 	}
 	w.m.usage["web"] = &usage{mem: []float64{1 << 20}}
-	if got := w.m.usageColumns("db", 100); strings.TrimSpace(got) != "" || len(got) != 24 {
-		t.Errorf("blank %q", got)
+	if !w.m.showUsage(100) || w.m.showUsage(60) {
+		t.Error("room for usage")
 	}
-	if got := w.m.usageColumns("web", 100); !strings.Contains(got, "1M") {
+	row := func(svc string) string {
+		return ansi.Strip(w.m.renderService(app.ServiceStatus{Service: svc, State: "running", Status: "Up 2 seconds"}, false, 100))
+	}
+	if got := row("web"); !strings.Contains(got, "1M") {
 		t.Errorf("memory only %q", got)
 	}
-	if w.m.usageColumns("web", 60) != "" {
-		t.Error("narrow")
+	if web, db := row("web"), row("db"); strings.Index(web, "2 seconds") != strings.Index(db, "2 seconds") {
+		t.Errorf("columns line up:\n%s\n%s", web, db)
 	}
 }
 

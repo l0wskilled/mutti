@@ -21,7 +21,7 @@ func newKeyMap() keyMap {
 		Enter:    b([]string{"enter"}, "enter", "services / shell"),
 		Filter:   b([]string{"/"}, "/", "filter instances"),
 		Mark:     b([]string{"space"}, "space", "mark services"),
-		Start:    b([]string{"u"}, "u", "start"),
+		Start:    b([]string{"u"}, "u", "up"),
 		Stop:     b([]string{"s"}, "s", "stop"),
 		Restart:  b([]string{"r"}, "r", "restart"),
 		Down2:    b([]string{"d"}, "d", "down"),
@@ -40,20 +40,23 @@ func newKeyMap() keyMap {
 	}
 }
 
-// footer are the keys of the pane with the focus; ? and : have the rest.
+// footer are every key of the pane with the focus.
 func (k keyMap) footer(focus pane, marked bool) []key.Binding {
 	hint := func(keys, desc string) key.Binding {
 		return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
 	}
 	common := []key.Binding{hint(":", "commands"), k.Help, k.Quit}
 	if focus == paneInstances {
-		return append([]key.Binding{hint("tab", "services"), k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, hint("o", "open"), hint("/", "filter")}, common...)
+		return append([]key.Binding{
+			hint("tab", "services"), k.Start, k.Stop, k.Restart, k.Down2, k.Reset, k.Destroy, k.Logs, k.Diagnose,
+			hint("o", "open"), hint("y", "copy URL"), hint("n", "new worktree"), hint("T", "tidy"), hint("/", "filter"),
+		}, common...)
 	}
 	keys := []key.Binding{hint("tab", "instances"), hint("space", "mark")}
 	if marked {
 		keys = append(keys, hint("esc", "unmark"))
 	}
-	keys = append(keys, k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, hint("enter", "shell"))
+	keys = append(keys, k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, hint("enter", "shell"), hint("e", "exec"), hint("o", "open"), hint("y", "copy URL"))
 	return append(keys, common...)
 }
 

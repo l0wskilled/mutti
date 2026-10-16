@@ -43,13 +43,15 @@ func TestListFailed(t *testing.T) {
 	}
 }
 
-func TestPaneTitlesFollowTheFocus(t *testing.T) {
+func TestPanesHaveTheirTitleInTheBorder(t *testing.T) {
 	w := setup(t)
-	if w.m.paneTitle("X", paneInstances) == w.m.paneTitle("X", paneServices) {
+	if m := w.m; m.box("X", 20, 4, "", true) == m.box("X", 20, 4, "", false) {
 		t.Error("the focused pane stands out")
 	}
 	press(w.m, "tab")
-	if !strings.Contains(w.screen(), "› ● shop") || !strings.Contains(w.screen(), "SERVICES") {
-		t.Errorf("the selected instance stays marked\n%s", w.screen())
+	for _, want := range []string{"╭─ INSTANCES ─", "╭─ shop · running ─", "› ● shop", "SERVICE", "STATE"} {
+		if !strings.Contains(w.screen(), want) {
+			t.Errorf("no %q in\n%s", want, w.screen())
+		}
 	}
 }

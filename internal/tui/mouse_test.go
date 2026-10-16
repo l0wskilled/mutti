@@ -37,13 +37,13 @@ func TestMouse(t *testing.T) {
 		t.Error("nothing there")
 	}
 	// The instances pane: the selected one only takes the focus, another one is selected.
-	if click(1, 2+paneTop); w.m.focus != paneInstances || w.m.selected != w.Root {
+	if click(1, paneTop); w.m.focus != paneInstances || w.m.selected != w.Root {
 		t.Fatalf("shop: %q", w.m.selected)
 	}
-	if cmd := click(1, 5+paneTop); w.m.selected != "/blog" || cmd == nil {
+	if cmd := click(1, 3+paneTop); w.m.selected != "/blog" || cmd == nil {
 		t.Fatalf("blog: %q", w.m.selected)
 	}
-	w.m.Update(tea.MouseClickMsg{X: 1, Y: 2 + paneTop, Button: tea.MouseRight})
+	w.m.Update(tea.MouseClickMsg{X: 1, Y: paneTop, Button: tea.MouseRight})
 	if w.m.selected != "/blog" {
 		t.Error("right button")
 	}

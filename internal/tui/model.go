@@ -168,7 +168,7 @@ func newModel(ctx context.Context, opts Options) *model {
 	m.palette.SetShowHelp(false)
 	m.palette.Filter = filterPalette
 	m.palette.FilterInput.Prompt = "What do you want to do? › "
-	m.palette.FilterInput.Placeholder = "start, logs, worktree, doctor…"
+	m.palette.FilterInput.Placeholder = "up, logs, worktree, doctor…"
 	return m
 }
 

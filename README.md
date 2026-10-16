@@ -167,9 +167,10 @@ Otherwise it refuses to touch the host's router; `MUTTI_ROUTER_NAME`, `MUTTI_HTT
 `mutti tui` shows every instance on this machine, the services of the selected one and what is
 wrong with them, kept current as containers change. Every service shows its CPU and memory with a
 sparkline; the selected one also its image, uptime, restarts and last health check. The header
-tells whether Docker answers and the router runs.
+tells whether Docker answers and the router runs, the footer every key of the pane with the
+focus. A terminal narrower than 90 columns shows one pane at a time.
 
-Keys act on the selected instance or service, or on the services marked with space: start, stop,
+Keys act on the selected instance or service, or on the services marked with space: up, stop,
 restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and destroy, which
 removes an instance whatever state it is in, also when its worktree is gone. `T` tidies what
 deleted worktrees left behind, `/` filters the instances by name or branch. `:` searches every

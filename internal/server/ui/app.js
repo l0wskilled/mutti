@@ -166,7 +166,7 @@ function card(s) {
     actions.append(
       up
         ? el("button", { class: "btn", disabled: busy, onclick: (e) => act(e, "stop", s) }, iconSpan("stop"), "Stop")
-        : el("button", { class: "btn primary", disabled: busy, onclick: (e) => act(e, "up", s) }, iconSpan("play"), "Start"),
+        : el("button", { class: "btn primary", disabled: busy, onclick: (e) => act(e, "up", s) }, iconSpan("play"), "Up"),
     );
   }
   actions.append(el("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openDrawer(s.path, "logs"); } }, iconSpan("logs"), "Logs"));
@@ -210,7 +210,7 @@ function card(s) {
 async function act(event, action, s) {
   event?.stopPropagation();
   if (action === "down") {
-    const ok = await confirmDialog(`Remove ${s.name}?`, "Its containers and networks are removed. Its data stays, and Start brings it back.", "Remove");
+    const ok = await confirmDialog(`Remove ${s.name}?`, "Its containers and networks are removed. Its data stays, and Up brings it back.", "Remove");
     if (!ok) return;
   }
   state.busy.set(s.path, action);
@@ -299,7 +299,7 @@ function renderDrawerHead() {
   const buttons = [];
   if (up && s.urls?.length) buttons.push(el("a", { class: "btn primary", href: s.urls[0], target: "_blank", rel: "noopener" }, iconSpan("open"), "Open"));
   if (!s.orphaned) {
-    buttons.push(el("button", { class: up ? "btn" : "btn primary", disabled: busy, onclick: (e) => act(e, "up", s) }, iconSpan("play"), up ? "Update" : "Start"));
+    buttons.push(el("button", { class: up ? "btn" : "btn primary", disabled: busy, onclick: (e) => act(e, "up", s) }, iconSpan("play"), up ? "Update" : "Up"));
     if (up) buttons.push(el("button", { class: "btn", disabled: busy, onclick: (e) => act(e, "stop", s) }, iconSpan("stop"), "Stop"));
   }
   buttons.push(el("button", { class: "btn danger", disabled: busy, onclick: (e) => act(e, "down", s) }, iconSpan("trash"), "Remove"));
@@ -393,12 +393,12 @@ function profileHead(s, profile, services) {
     "div",
     { class: "profile-head" },
     el("div", {}, el("strong", { text: profile }), el("span", { class: "muted", text: "Optional, runs when started" })),
-    idle.length > 1 ? serviceButton(s, "up", idle, "Start all") : null,
+    idle.length > 1 ? serviceButton(s, "up", idle, "Up all") : null,
   );
 }
 
 const serviceActions = {
-  up: { icon: "play", label: "Start", busy: "Starting", done: "started", fail: "start" },
+  up: { icon: "play", label: "Up", busy: "Starting", done: "started", fail: "start" },
   stop: { icon: "stop", label: "Stop", busy: "Stopping", done: "stopped", fail: "stop" },
   restart: { icon: "restart", label: "Restart", busy: "Restarting", done: "restarted", fail: "restart" },
 };
