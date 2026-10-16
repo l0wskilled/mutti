@@ -1196,12 +1196,26 @@ func TestTUICommand(t *testing.T) {
 	if code := tty(); code != 0 || got.Dir != w.root || got.Self == "" {
 		t.Fatalf("tui: %d %+v", code, got)
 	}
-	names := map[string]bool{}
+	uses := map[string]string{}
 	for _, c := range got.Commands {
-		names[c.Name] = true
+		uses[strings.Join(c.Path, " ")] = c.Use
 	}
-	if !names["up"] || !names["worktree"] || names["tui"] || names["mcp"] || names["help"] {
-		t.Errorf("commands %v", names)
+	for path, use := range map[string]string{
+		"up":              "up [flags] [service...]",
+		"doctor":          "doctor",
+		"router status":   "router status",
+		"run":             "run [flags] -- <command> [args...]",
+		"exec":            "exec [flags] <service> -- <command> [args...]",
+		"worktree remove": "worktree remove [flags] <name|path>",
+	} {
+		if uses[path] != use {
+			t.Errorf("%s: %q", path, uses[path])
+		}
+	}
+	for _, path := range []string{"tui", "mcp", "help", "router", "worktree"} {
+		if _, ok := uses[path]; ok {
+			t.Errorf("offers %s", path)
+		}
 	}
 	executable = func() (string, error) { return "", errors.New("no binary") }
 	if code := tty(); code != ExitError {

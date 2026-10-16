@@ -17,12 +17,12 @@ import (
 
 // Command is a mutti command the palette offers.
 type Command struct {
-	Name  string
-	Use   string // with its arguments, e.g. "exec <service> -- <command...>"
+	Path  []string // the words that call it, e.g. ["router", "status"]
+	Use   string   // the path with its arguments, e.g. "exec <service> -- <command...>"
 	Short string
 }
 
-// takesArgs reports whether the command wants arguments.
+// takesArgs reports whether the command wants arguments or has flags.
 func (c Command) takesArgs() bool {
 	for _, r := range c.Use {
 		if r == '<' || r == '[' {

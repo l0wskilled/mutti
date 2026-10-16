@@ -20,6 +20,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/l0wskilled/mutti/internal/app"
 	"github.com/l0wskilled/mutti/internal/compose"
@@ -1263,6 +1264,38 @@ var (
 // tuiHidden are the commands the terminal UI does not offer: they only make sense outside it.
 var tuiHidden = []string{"tui", "mcp", "help", "completion", "prompt"}
 
+// tuiCommands lists every command the terminal UI offers, the subcommands of a group under
+// the group's path. A command with flags of its own says so in its use, before the arguments, so the UI asks
+// for them.
+func tuiCommands(path []string, cmds []*cobra.Command) []tui.Command {
+	var out []tui.Command
+	for _, cmd := range cmds {
+		if cmd.Hidden || slices.Contains(tuiHidden, cmd.Name()) {
+			continue
+		}
+		p := append(slices.Clone(path), cmd.Name())
+		if cmd.Runnable() {
+			use := strings.Join(p, " ")
+			if args := strings.TrimPrefix(cmd.Use, cmd.Name()); !cmd.DisableFlagParsing && ownFlags(cmd) && !strings.Contains(args, "[flags]") {
+				use += " [flags]"
+			}
+			use += strings.TrimPrefix(cmd.Use, cmd.Name())
+			out = append(out, tui.Command{Path: p, Use: use, Short: cmd.Short})
+		}
+		out = append(out, tuiCommands(p, cmd.Commands())...)
+	}
+	return out
+}
+
+// ownFlags reports whether cmd has flags besides the global ones and --help.
+func ownFlags(cmd *cobra.Command) bool {
+	found := false
+	cmd.LocalNonPersistentFlags().VisitAll(func(f *pflag.Flag) {
+		found = found || (f.Name != "help" && !f.Hidden)
+	})
+	return found
+}
+
 func tuiCmd(d *Deps, commands func() []*cobra.Command) *cobra.Command {
 	return &cobra.Command{
 		Use:   "tui",
@@ -1276,12 +1309,7 @@ func tuiCmd(d *Deps, commands func() []*cobra.Command) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := tui.Options{App: d.App, Dir: d.Dir, Self: self, Version: d.Version}
-			for _, cmd := range commands() {
-				if !cmd.Hidden && !slices.Contains(tuiHidden, cmd.Name()) {
-					opts.Commands = append(opts.Commands, tui.Command{Name: cmd.Name(), Use: cmd.Use, Short: cmd.Short})
-				}
-			}
+			opts := tui.Options{App: d.App, Dir: d.Dir, Self: self, Version: d.Version, Commands: tuiCommands(nil, commands())}
 			return runTUI(c.Context(), opts, d.In, d.Out)
 		},
 	}

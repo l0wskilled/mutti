@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -261,14 +262,14 @@ func (m *model) command(c Command) tea.Cmd {
 		dir = m.opts.Dir
 	}
 	if !c.takesArgs() {
-		return m.runInTerminal(dir, c.Name)
+		return m.runInTerminal(dir, c.Path...)
 	}
 	value := ""
 	if strings.Contains(c.Use, "service") {
 		value = m.service()
 	}
 	return m.askFor("mutti "+c.Use, value, func(args string) tea.Cmd {
-		return m.runInTerminal(dir, append([]string{c.Name}, strings.Fields(args)...)...)
+		return m.runInTerminal(dir, append(slices.Clone(c.Path), strings.Fields(args)...)...)
 	})
 }
 

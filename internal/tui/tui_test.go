@@ -126,7 +126,7 @@ func setup(t *testing.T) *world {
 	if _, err := w.App.Up(context.Background(), w.Root, app.UpOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	commands := []Command{{Name: "list", Use: "list", Short: "List every instance"}, {Name: "exec", Use: "exec <service> -- <command...>", Short: "Run a command"}}
+	commands := []Command{{Path: []string{"list"}, Use: "list", Short: "List every instance"}, {Path: []string{"exec"}, Use: "exec <service> -- <command...>", Short: "Run a command"}}
 	w.m = newModel(context.Background(), Options{App: w.App, Dir: w.Root, Self: "true", Version: "test", Commands: commands})
 	w.m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	msgs := messages(w.m.Init())
@@ -579,7 +579,7 @@ func TestPalette(t *testing.T) {
 	}
 	// Without an instance commands run where mutti runs.
 	w.m.selected = ""
-	if w.m.command(Command{Name: "doctor", Use: "doctor"}) == nil {
+	if w.m.command(Command{Path: []string{"doctor"}, Use: "doctor"}) == nil {
 		t.Error("doctor")
 	}
 }
