@@ -275,7 +275,7 @@ function openDrawer(path, tab = "services") {
   if (changed) {
     $("tab-services").replaceChildren();
     $("l-service").replaceChildren();
-    lastLogs = "";
+    closeLogStream();
   }
   render();
   selectTab(tab);
@@ -284,7 +284,7 @@ function openDrawer(path, tab = "services") {
 function closeDrawer() {
   state.selected = "";
   $("drawer").hidden = true;
-  stopFollow();
+  closeLogStream();
   render();
 }
 
@@ -311,7 +311,7 @@ function selectTab(tab) {
   state.tab = tab;
   for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
   for (const t of ["services", "logs", "events"]) $(`tab-${t}`).hidden = t !== tab;
-  stopFollow();
+  closeLogStream();
   if (tab === "services") loadServices();
   if (tab === "logs") openLogs();
   if (tab === "events") renderEvents();
@@ -473,64 +473,208 @@ async function loadServices() {
 }
 
 // ---- Logs
+//
+// The log streams in and stays complete in memory (up to maxLogLines); the page holds only
+// the rows in view. A line is one or more rows of the monospace font: with wrap on, as many as
+// its length needs at the width of the view, so every row has the same height and the
+// position of any line is a sum.
 
-let followTimer;
-let lastLogs = "";
+const maxLogLines = 100000;
+const overscan = 30; // rows rendered above and below the view
+const logs = {
+  lines: [], // all lines received
+  dropped: 0, // lines dropped from the start to stay under maxLogLines
+  shown: null, // indexes of the lines the filter keeps; null: all
+  starts: [0], // starts[i]: the first row of shown line i; the last entry is the total
+  longest: 0, // characters of the longest line, for the width without wrap
+  source: null, // the EventSource
+  frame: 0, // a pending render
+  rowH: 18,
+  charW: 7.5,
+};
 
-function stopFollow() {
-  clearInterval(followTimer);
-  followTimer = undefined;
+function closeLogStream() {
+  logs.source?.close();
+  logs.source = null;
 }
 
+// openLogs streams the logs of the selected instance, or one of its services, from the start.
 async function openLogs() {
   if ($("l-service").options.length === 0) await loadServices();
-  await loadLogs();
-  if ($("l-follow").checked && state.tab === "logs") followTimer = setInterval(loadLogs, 2000);
-}
-
-async function loadLogs() {
   const s = selectedInstance();
   if (!s) return;
-  try {
-    const logs = await api(`/api/logs?dir=${q(s.path)}&tail=500&service=${q($("l-service").value)}`);
-    lastLogs = logs.output;
-  } catch (err) {
-    lastLogs = err.message;
-  }
-  renderLogs();
+  closeLogStream();
+  Object.assign(logs, { lines: [], dropped: 0, longest: 0 });
+  setLogStatus("connecting…");
+  scheduleLogRender(true);
+  const src = new EventSource(`/api/logs/stream?dir=${q(s.path)}&service=${q($("l-service").value)}`);
+  logs.source = src;
+  src.onopen = () => setLogStatus("");
+  src.onmessage = (e) => appendLogLines(JSON.parse(e.data));
+  src.addEventListener("end", () => {
+    closeLogStream();
+    setLogStatus("the services stopped printing: the stream ended");
+  });
+  src.addEventListener("error", (e) => {
+    if (e.data) {
+      const body = JSON.parse(e.data);
+      setLogStatus(body.error.message);
+      return;
+    }
+    if (logs.source === src) {
+      closeLogStream(); // a reconnect would repeat the whole start
+      setLogStatus("disconnected · switch the service or the tab to reconnect");
+    }
+  });
 }
 
-// logFragment renders log lines with the service name, timestamp and errors set apart.
-function logFragment(text, filter = "") {
-  const lines = text.split("\n").filter((l) => l && (!filter || l.toLowerCase().includes(filter)));
-  const frag = document.createDocumentFragment();
-  if (lines.length === 0) frag.append(el("span", { class: "lempty", text: filter ? "No line matches the filter." : "No output yet." }));
-  for (const line of lines) {
-    const m = line.match(/^(\S+\s*\|\s)(\S+Z\s)?(.*)$/); // "service-1  | 2026-...Z message"
-    const kind = /\b(error|fatal|panic|exception|critical)\b/i.test(line) ? "lerr" : /\bwarn(ing)?\b/i.test(line) ? "lwarn" : "";
-    const span = el("span", { class: kind });
-    if (m) span.append(el("span", { class: "svcname", text: m[1] }), m[2] ? el("span", { class: "ts", text: m[2] }) : "", m[3]);
-    else span.append(line);
-    frag.append(span, "\n");
+function appendLogLines(batch) {
+  if (batch.length === 0) return;
+  for (const raw of batch) {
+    const l = raw.replaceAll("\t", "    "); // a tab is one character but several columns
+    logs.lines.push(l);
+    logs.longest = Math.max(logs.longest, l.length);
   }
-  return frag;
+  if (logs.lines.length > maxLogLines) {
+    const extra = logs.lines.length - maxLogLines;
+    logs.lines.splice(0, extra);
+    logs.dropped += extra;
+  }
+  scheduleLogRender(true);
+}
+
+function setLogStatus(text) {
+  $("l-status").textContent = text;
+}
+
+// scheduleLogRender renders on the next frame, at most once per frame however much arrives.
+function scheduleLogRender(changed) {
+  logs.changed ||= changed;
+  if (!logs.frame) logs.frame = requestAnimationFrame(renderLogs);
+}
+
+// measureLogFont finds the size of one character of the log font.
+function measureLogFont() {
+  const probe = el("span", { text: "M".repeat(100) });
+  Object.assign(probe.style, { position: "absolute", visibility: "hidden", whiteSpace: "pre" });
+  $("l-output").append(probe);
+  const box = probe.getBoundingClientRect();
+  probe.remove();
+  if (box.width > 0) {
+    logs.charW = box.width / 100;
+    logs.rowH = box.height;
+  }
+}
+
+// layoutLogs works out which lines the filter keeps and the row each of them starts at.
+function layoutLogs() {
+  const out = $("l-output");
+  const filter = $("l-filter").value.toLowerCase();
+  const wrap = $("l-wrap").checked;
+  const cols = Math.max(1, Math.floor((out.clientWidth - 32) / logs.charW));
+  logs.shown = filter ? [] : null;
+  const starts = [0];
+  let row = 0;
+  for (let i = 0; i < logs.lines.length; i++) {
+    const line = logs.lines[i];
+    if (filter) {
+      if (!line.toLowerCase().includes(filter)) continue;
+      logs.shown.push(i);
+    }
+    row += wrap ? Math.max(1, Math.ceil(line.length / cols)) : 1;
+    starts.push(row);
+  }
+  logs.starts = starts;
+  out.classList.toggle("wrap", wrap);
 }
 
 function renderLogs() {
+  logs.frame = 0;
   const out = $("l-output");
-  const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
-  const filter = $("l-filter").value.toLowerCase();
-  out.replaceChildren(logFragment(lastLogs, filter));
-  if (atBottom) out.scrollTop = out.scrollHeight;
+  if (logs.changed) {
+    layoutLogs();
+    logs.changed = false;
+  }
+  const count = logs.starts.length - 1;
+  const total = logs.starts[count] * logs.rowH;
+  const spacer = $("l-spacer");
+  spacer.style.height = `${total}px`;
+  spacer.style.width = $("l-wrap").checked ? "100%" : `${logs.longest * logs.charW + 32}px`;
+  if ($("l-follow").checked) out.scrollTop = out.scrollHeight;
+
+  // The lines of the rows in view, and some more around them.
+  const firstRow = Math.max(0, Math.floor(out.scrollTop / logs.rowH) - overscan);
+  const lastRow = Math.ceil((out.scrollTop + out.clientHeight) / logs.rowH) + overscan;
+  let i = lineAtRow(firstRow);
+  const rows = document.createDocumentFragment();
+  for (; i < count && logs.starts[i] < lastRow; i++) {
+    const line = logs.lines[logs.shown ? logs.shown[i] : i];
+    const node = logLine(line, "vrow");
+    node.style.top = `${logs.starts[i] * logs.rowH}px`;
+    rows.append(node);
+  }
+  if (count === 0) {
+    const filter = $("l-filter").value;
+    rows.append(el("div", { class: "vrow lempty", text: filter ? "No line matches the filter." : logs.source ? "No output yet." : "" }));
+  }
+  $("l-rows").replaceChildren(rows);
+  const dropped = logs.dropped ? ` · ${logs.dropped.toLocaleString()} older dropped` : "";
+  const matching = logs.shown ? `${count.toLocaleString()} of ` : "";
+  $("l-count").textContent = `${matching}${logs.lines.length.toLocaleString()} lines${dropped}`;
 }
 
-$("l-service").onchange = loadLogs;
-$("l-filter").oninput = renderLogs;
-$("l-wrap").onchange = (e) => $("l-output").classList.toggle("wrap", e.target.checked);
-$("l-follow").onchange = (e) => {
-  stopFollow();
-  if (e.target.checked) followTimer = setInterval(loadLogs, 2000);
-};
+// lineAtRow finds the shown line that holds a row.
+function lineAtRow(row) {
+  let lo = 0;
+  let hi = logs.starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (logs.starts[mid + 1] <= row) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// logLine renders a log line with the service name, timestamp and errors set apart.
+function logLine(line, cls = "") {
+  const m = line.match(/^(\S+\s*\|\s)(\S+Z\s)?(.*)$/); // "service-1  | 2026-...Z message"
+  const kind = /\b(error|fatal|panic|exception|critical)\b/i.test(line) ? "lerr" : /\bwarn(ing)?\b/i.test(line) ? "lwarn" : "";
+  const node = el("div", { class: `${cls} ${kind}`.trim() });
+  if (m) node.append(el("span", { class: "svcname", text: m[1] }), m[2] ? el("span", { class: "ts", text: m[2] }) : "", m[3]);
+  else node.append(line);
+  return node;
+}
+
+// logFragment renders a few log lines in full, for the diagnosis.
+function logFragment(text) {
+  const frag = document.createDocumentFragment();
+  for (const line of text.split("\n").filter(Boolean)) frag.append(logLine(line));
+  return frag;
+}
+
+function downloadLogs() {
+  const s = selectedInstance();
+  const name = `${s ? s.name : "mutti"}${$("l-service").value ? "-" + $("l-service").value : ""}.log`;
+  const url = URL.createObjectURL(new Blob([logs.lines.join("\n") + "\n"], { type: "text/plain" }));
+  el("a", { href: url, download: name }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$("l-service").onchange = openLogs;
+$("l-filter").oninput = () => scheduleLogRender(true);
+$("l-wrap").onchange = () => scheduleLogRender(true);
+$("l-follow").onchange = () => scheduleLogRender(false);
+$("l-download").onclick = downloadLogs;
+$("l-output").addEventListener("scroll", () => {
+  // Scrolling up stops following; scrolling to the end follows again.
+  const out = $("l-output");
+  $("l-follow").checked = out.scrollHeight - out.scrollTop - out.clientHeight < logs.rowH * 2;
+  scheduleLogRender(false);
+});
+new ResizeObserver(() => {
+  measureLogFont();
+  scheduleLogRender(true);
+}).observe($("l-output"));
 
 // ---- Events
 

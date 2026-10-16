@@ -179,7 +179,8 @@ mutti serves http://127.0.0.1:7477 (Ctrl-C to stop)
 ```
 
 Every instance on this machine, kept current as containers change: status, branch, URLs and
-ports, starting, stopping and removing, logs and events. It runs in the foreground like any
+ports, starting, stopping and removing single services or all of them, a diagnosis of what is not
+well, events, and logs that stream in live and stay whole and scrollable however long they get. It runs in the foreground like any
 other command, answers only on 127.0.0.1, and serves the same data as JSON under `/api` and the
 tools of `mutti mcp` under `/mcp`.
 

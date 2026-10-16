@@ -50,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("GET /api/diagnose", s.diagnose)
 	mux.HandleFunc("GET /api/logs", s.logs)
+	mux.HandleFunc("GET /api/logs/stream", s.logStream)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/doctor", s.doctor)
 	mux.HandleFunc("POST /api/up", s.lifecycle("up"))

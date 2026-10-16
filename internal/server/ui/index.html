@@ -92,8 +92,12 @@
           <input id="l-filter" type="search" placeholder="Filter lines" spellcheck="false">
           <label class="toggle"><input id="l-follow" type="checkbox" checked><span>Follow</span></label>
           <label class="toggle"><input id="l-wrap" type="checkbox" checked><span>Wrap</span></label>
+          <button id="l-download" class="btn sm" title="Download the whole log">Download</button>
         </div>
-        <pre id="l-output" class="logs wrap"></pre>
+        <div class="log-meta"><span id="l-count"></span><span id="l-status"></span></div>
+        <div id="l-output" class="logs vlog wrap" tabindex="0">
+          <div id="l-spacer" class="vspacer"><div id="l-rows"></div></div>
+        </div>
       </section>
       <section id="tab-events" class="tab-panel" hidden>
         <ol id="d-events" class="timeline"></ol>

@@ -333,6 +333,12 @@ a:hover { text-decoration: underline; }
   white-space: pre;
 }
 .logs.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The virtual log view: rows sit at their place in a spacer as tall as the whole log. */
+.vlog { position: relative; padding: 0; font-family: var(--mono); }
+.vspacer { position: relative; min-height: 100%; }
+.vrow { position: absolute; left: 1rem; right: 1rem; white-space: pre; }
+.vlog.wrap .vrow { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; }
+.log-meta { display: flex; justify-content: space-between; gap: 1rem; margin: 0.35rem 0.1rem; font-size: 0.75rem; color: var(--text-3); }
 .logs .svcname { color: #a5a0ff; }
 .logs .ts { color: #6f7685; }
 .logs .lerr { color: #ff8a8a; }
