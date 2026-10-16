@@ -83,7 +83,8 @@ type (
 		diags []app.Diagnosis
 		err   error
 	}
-	copyMsg struct {
+	routerMsg struct{ check app.Check }
+	copyMsg   struct {
 		url string
 		err error
 	}
@@ -116,6 +117,7 @@ type model struct {
 	diags     map[string]app.Diagnosis
 	statusErr error
 	listErr   error
+	router    *app.Check // nil until known
 	svcCursor int
 	marked    map[string]bool // services the actions act on together
 	// Where the last render put the instances and services, for the mouse.
@@ -171,7 +173,7 @@ func newModel(ctx context.Context, opts Options) *model {
 func (m *model) Init() tea.Cmd {
 	a, _ := m.app()
 	m.events, _ = a.Events(m.ctx)
-	return tea.Batch(m.loadInstances(), m.waitEvent(), tick(), sampleTick(), tea.RequestBackgroundColor)
+	return tea.Batch(m.loadInstances(), m.loadRouter(), m.waitEvent(), tick(), sampleTick(), tea.RequestBackgroundColor)
 }
 
 // app is mutti's app with its output captured, so nothing writes over the UI.
@@ -217,7 +219,14 @@ func (m *model) loadStatus() tea.Cmd {
 	}
 }
 
-func (m *model) refresh() tea.Cmd { return tea.Batch(m.loadInstances(), m.loadStatus()) }
+func (m *model) loadRouter() tea.Cmd {
+	a, _ := m.app()
+	return func() tea.Msg { return routerMsg{check: a.RouterCheck(m.ctx)} }
+}
+
+func (m *model) refresh() tea.Cmd {
+	return tea.Batch(m.loadInstances(), m.loadStatus(), m.loadRouter())
+}
 
 // current is the selected instance, or nil.
 func (m *model) current() *app.Summary {
@@ -320,6 +329,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.loadDetails(), sampleTick())
 	case detailsMsg:
 		m.gotDetails(msg)
+		return m, nil
+	case routerMsg:
+		m.router = &msg.check
 		return m, nil
 	case toastDoneMsg:
 		if msg.id == m.toastID {

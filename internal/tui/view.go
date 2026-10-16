@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -53,7 +54,7 @@ func (m *model) header() string {
 	if care > 0 {
 		summary += s.errText.Render(fmt.Sprintf(" · %d need care", care))
 	}
-	left := " " + s.brand.Render("◆ mutti") + s.faintText.Render(" "+m.opts.Version) + "   " + s.muted.Render(summary)
+	left := " " + s.brand.Render("◆ mutti") + s.faintText.Render(" "+m.opts.Version) + "   " + s.muted.Render(summary) + "   " + m.health()
 	right := ""
 	switch {
 	case m.busy != "":
@@ -70,12 +71,42 @@ func (m *model) header() string {
 	return left + strings.Repeat(" ", gap) + right
 }
 
+// health tells in the header whether Docker answers and the router runs.
+func (m *model) health() string {
+	s := m.styles
+	if dockerDown(m.listErr) {
+		return s.errText.Render("● docker unreachable")
+	}
+	out := s.okText.Render("●") + s.muted.Render(" docker")
+	switch {
+	case m.router == nil:
+	case m.router.Status == app.CheckOK:
+		out += "  " + s.okText.Render("●") + s.muted.Render(" router")
+	case m.router.Status == app.CheckWarn:
+		out += "  " + s.badge("starting").Render("● router "+lastWord(m.router.Detail))
+	default:
+		out += "  " + s.errText.Render("● router failing")
+	}
+	return out
+}
+
+// lastWord is the state at the end of a check's detail, e.g. "exited" of "... :443 (https), exited".
+func lastWord(detail string) string {
+	if i := strings.LastIndex(detail, ", "); i >= 0 {
+		return detail[i+2:]
+	}
+	return detail
+}
+
 func (m *model) footer() string {
 	return " " + m.help.ShortHelpView(m.keys.ShortHelp())
 }
 
 func (m *model) mainView(h int) string {
-	if len(m.instances) == 0 {
+	switch {
+	case len(m.instances) == 0 && m.listErr != nil:
+		return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, m.listFailed())
+	case len(m.instances) == 0:
 		return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, m.welcome())
 	}
 	lw := min(max(m.width/3, 28), 44)
@@ -119,6 +150,28 @@ func (m *model) withCheatSheet(instances string, h int) string {
 	return instances + strings.Repeat("\n", free) + strings.Join(sheet, "\n")
 }
 
+// dockerDown reports whether err says that Docker does not answer.
+func dockerDown(err error) bool {
+	var e *app.Error
+	return errors.As(err, &e) && e.Code == app.CodeDockerUnavailable
+}
+
+// listFailed is the main view while the instances cannot be listed.
+func (m *model) listFailed() string {
+	s := m.styles
+	title, hint := "mutti cannot list the instances", "mutti tries again every few seconds."
+	if dockerDown(m.listErr) {
+		title, hint = "Docker does not answer", "Start Docker; mutti looks again every few seconds."
+	}
+	return s.overlay.BorderForeground(s.red).Render(strings.Join([]string{
+		s.errText.Bold(true).Render(title),
+		"",
+		s.muted.Width(min(m.width-12, 70)).Render(m.listErr.Error()),
+		"",
+		s.muted.Render(hint),
+	}, "\n"))
+}
+
 func (m *model) welcome() string {
 	s := m.styles
 	return s.overlay.Render(strings.Join([]string{
@@ -133,7 +186,7 @@ func (m *model) welcome() string {
 
 func (m *model) instancesView(w int) string {
 	s := m.styles
-	lines := []string{s.muted.Render("INSTANCES"), ""}
+	lines := []string{m.paneTitle("INSTANCES", paneInstances), ""}
 	shown := m.shown()
 	m.instanceAt = map[int]string{}
 	if m.mode == modeFilter || m.filter.Value() != "" {
@@ -146,8 +199,10 @@ func (m *model) instancesView(w int) string {
 	for _, i := range shown {
 		marker, name := "  ", s.title.Render(i.Name)
 		if i.Path == m.selected {
-			marker = s.cursor.Render("› ")
-			name = s.cursor.Render(i.Name)
+			marker, name = s.cursor.Render("› "), s.cursor.Render(i.Name)
+			if m.focus != paneInstances { // the services have the keys
+				marker, name = s.muted.Render("› "), s.selectedRow.Render(i.Name)
+			}
 		}
 		count := s.muted.Render(fmt.Sprintf("%d/%d", i.Running, i.Total))
 		first := marker + s.dot(i.Status) + " " + name
@@ -160,6 +215,14 @@ func (m *model) instancesView(w int) string {
 		lines = append(lines, "    "+s.faintText.Render(trunc(detail, w-4)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// paneTitle is the title of a pane, in the accent color while the pane has the keys.
+func (m *model) paneTitle(title string, p pane) string {
+	if m.focus == p {
+		return m.styles.key.Render(title)
+	}
+	return m.styles.muted.Render(title)
 }
 
 func (m *model) servicesView(w int) string {
@@ -185,6 +248,7 @@ func (m *model) servicesView(w int) string {
 	case m.status == nil:
 		return strings.Join(append(lines, s.muted.Render(m.spinner.View()+" loading…")), "\n")
 	}
+	lines = append(lines, m.paneTitle("SERVICES", paneServices))
 	svcs := m.services()
 	m.serviceAt = map[int]int{}
 	nameW := 0

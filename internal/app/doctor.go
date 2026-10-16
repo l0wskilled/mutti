@@ -127,25 +127,31 @@ func (a *App) Doctor(ctx context.Context, dir string) *Report {
 }
 
 func (a *App) checkRouter(ctx context.Context, r *Report) {
+	r.Checks = append(r.Checks, a.RouterCheck(ctx))
+}
+
+// RouterCheck tells whether the router runs as it should, without touching it.
+func (a *App) RouterCheck(ctx context.Context) Check {
+	check := func(status, detail, hint string) Check {
+		return Check{Name: "router", Status: status, Detail: detail, Hint: hint}
+	}
 	s, err := a.routerSettings()
 	if err != nil {
-		r.add("router", CheckFail, err.Error(), "")
-		return
+		return check(CheckFail, err.Error(), "")
 	}
 	c, ok, err := a.Engine.InspectContainer(ctx, s.Name)
 	addr := fmt.Sprintf("%s on 127.0.0.1:%d (http) and :%d (https)", s.Name, s.HTTPPort, s.HTTPSPort)
 	switch {
 	case err != nil:
-		r.add("router", CheckFail, err.Error(), "")
+		return check(CheckFail, err.Error(), "")
 	case !ok:
-		r.add("router", CheckWarn, "not created yet", "it starts with the first mutti up")
+		return check(CheckWarn, "not created yet", "it starts with the first mutti up")
 	case c.Labels[router.LabelVersion] != router.Spec(s).Labels[router.LabelVersion]:
-		r.add("router", CheckWarn, addr+", outdated", "mutti up or mutti router restart replaces it")
+		return check(CheckWarn, addr+", outdated", "mutti up or mutti router restart replaces it")
 	case c.State != "running":
-		r.add("router", CheckWarn, addr+", "+c.State, "mutti up or mutti router restart starts it")
-	default:
-		r.add("router", CheckOK, addr, "")
+		return check(CheckWarn, addr+", "+c.State, "mutti up or mutti router restart starts it")
 	}
+	return check(CheckOK, addr, "")
 }
 
 func (a *App) checkTrust(r *Report) {
