@@ -115,6 +115,8 @@ type model struct {
 	statusErr error
 	listErr   error
 	svcCursor int
+	details   map[string]app.ServiceDetails // by service
+	usage     map[string]*usage             // by service, while it runs
 
 	events  <-chan app.InstanceEvent
 	pending bool // a refresh after events is on its way
@@ -140,6 +142,7 @@ type model struct {
 
 func newModel(ctx context.Context, opts Options) *model {
 	m := &model{ctx: ctx, opts: opts, styles: newStyles(true), keys: newKeyMap(), diags: map[string]app.Diagnosis{}, follow: true}
+	m.forgetDetails()
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.MiniDot))
 	m.input = textinput.New()
 	m.input.Prompt = "› "
@@ -158,7 +161,7 @@ func newModel(ctx context.Context, opts Options) *model {
 func (m *model) Init() tea.Cmd {
 	a, _ := m.app()
 	m.events, _ = a.Events(m.ctx)
-	return tea.Batch(m.loadInstances(), m.waitEvent(), tick(), tea.RequestBackgroundColor)
+	return tea.Batch(m.loadInstances(), m.waitEvent(), tick(), sampleTick(), tea.RequestBackgroundColor)
 }
 
 // app is mutti's app with its output captured, so nothing writes over the UI.
@@ -299,6 +302,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.refresh()
 	case tickMsg:
 		return m, tea.Batch(m.refresh(), tick())
+	case sampleMsg:
+		return m, tea.Batch(m.loadDetails(), sampleTick())
+	case detailsMsg:
+		m.gotDetails(msg)
+		return m, nil
 	case toastDoneMsg:
 		if msg.id == m.toastID {
 			m.toast = ""
@@ -385,7 +393,8 @@ func (m *model) gotInstances(msg instancesMsg) tea.Cmd {
 		m.selected = m.instances[0].Path
 	}
 	m.status, m.svcCursor = nil, 0
-	return m.loadStatus()
+	m.forgetDetails()
+	return tea.Batch(m.loadStatus(), m.loadDetails())
 }
 
 func (m *model) gotStatus(msg statusMsg) {
@@ -490,7 +499,8 @@ func (m *model) move(by int) tea.Cmd {
 	i := slices.IndexFunc(m.instances, func(s app.Summary) bool { return s.Path == m.selected })
 	m.selected = m.instances[(i+by+n)%n].Path
 	m.status, m.statusErr, m.svcCursor, m.diags = nil, nil, 0, map[string]app.Diagnosis{}
-	return m.loadStatus()
+	m.forgetDetails()
+	return tea.Batch(m.loadStatus(), m.loadDetails())
 }
 
 func (m *model) switchPane() {

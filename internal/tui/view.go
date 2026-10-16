@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -188,7 +189,7 @@ func (m *model) servicesView(w int) string {
 		if m.focus == paneServices && i == m.svcCursor {
 			marker, name = s.cursor.Render("› "), s.selectedRow.Render(svc.Service)
 		}
-		row := fmt.Sprintf("%s%s  %s  %s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), s.badge(kind).Render(fmt.Sprintf("%-10s", word)), s.faintText.Render(svc.Status))
+		row := fmt.Sprintf("%s%s  %s  %s%s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), s.badge(kind).Render(fmt.Sprintf("%-10s", word)), m.usageColumns(svc.Service, w), s.faintText.Render(svc.Status))
 		if _, sick := m.diags[svc.Service]; sick {
 			row += s.errText.Render("  !")
 		}
@@ -196,6 +197,24 @@ func (m *model) servicesView(w int) string {
 	}
 	lines = append(lines, "", m.detailView(w))
 	return strings.Join(lines, "\n")
+}
+
+// usageColumns are the CPU and memory of a running service in its row, blank for the others so
+// the columns line up. Narrow panes leave them out.
+func (m *model) usageColumns(service string, w int) string {
+	const width = 6 + 1 + 8 + 2 + 5 + 2
+	if w < 70 || len(m.usage) == 0 {
+		return ""
+	}
+	u := m.usage[service]
+	if u == nil {
+		return strings.Repeat(" ", width)
+	}
+	cpu := strings.Repeat(" ", 6+1+8)
+	if len(u.cpu) > 0 {
+		cpu = fmt.Sprintf("%5.1f%% ", last(u.cpu)) + m.styles.accentText.Render(cpuLine(u.cpu, 8))
+	}
+	return cpu + "  " + m.styles.muted.Render(fmt.Sprintf("%5s", humanBytes(last(u.mem)))) + "  "
 }
 
 // detailView tells about the selected service, or what needs care.
@@ -208,23 +227,58 @@ func (m *model) detailView(w int) string {
 		}
 		return s.muted.Render("tab: pick a service · enter: shell · u/s/r: start, stop, restart")
 	}
+	lines := m.facts(svc)
 	if d, ok := m.diags[svc]; ok {
-		return s.diag.Width(w).Render(m.renderDiagnosisShort(d, w-2))
+		return strings.Join(append(lines, "", s.diag.Width(w).Render(m.renderDiagnosisShort(d, w-2))), "\n")
 	}
-	var lines []string
 	for _, st := range m.services() {
 		if st.Service != svc {
 			continue
 		}
 		for _, u := range st.URLs {
-			lines = append(lines, s.muted.Render("url   ")+s.accentText.Render(u))
+			lines = append(lines, s.muted.Render(fmt.Sprintf("%-7s", "url"))+s.accentText.Render(u))
 		}
 		for _, p := range st.Ports {
-			lines = append(lines, s.muted.Render(fmt.Sprintf("port  %d → ", p.ContainerPort))+p.Address)
+			lines = append(lines, s.muted.Render(fmt.Sprintf("%-7s%d → ", "port", p.ContainerPort))+p.Address)
 		}
 	}
 	lines = append(lines, s.muted.Render("enter: shell · e: exec · l: logs · i: diagnose"))
 	return strings.Join(lines, "\n")
+}
+
+// facts are what the selected service runs, since when and what it uses.
+func (m *model) facts(svc string) []string {
+	s := m.styles
+	d, ok := m.details[svc]
+	if !ok {
+		return nil
+	}
+	label := func(l string) string { return s.muted.Render(fmt.Sprintf("%-7s", l)) }
+	lines := []string{label("image") + d.Image}
+	u := m.usage[svc]
+	if u != nil && !d.StartedAt.IsZero() {
+		up := label("up") + humanDuration(time.Since(d.StartedAt))
+		if d.RestartCount > 0 {
+			up += s.errText.Render(fmt.Sprintf(" · restarted %d times", d.RestartCount))
+		}
+		lines = append(lines, up)
+	}
+	if h := d.Health; h != nil {
+		state := s.okText.Render("passing")
+		if h.ExitCode != 0 {
+			state = s.errText.Render(fmt.Sprintf("failing, exit %d", h.ExitCode))
+		}
+		lines = append(lines, label("health")+state+s.faintText.Render(" · "+humanDuration(time.Since(h.Time))+" ago"))
+	}
+	if u != nil {
+		cpu := "…"
+		if len(u.cpu) > 0 {
+			cpu = fmt.Sprintf("%-14s", fmt.Sprintf("%.1f%%", last(u.cpu))) + s.accentText.Render(cpuLine(u.cpu, len(u.cpu)))
+		}
+		mem := fmt.Sprintf("%-14s", humanBytes(last(u.mem))+" of "+humanBytes(float64(u.last.MemoryLimit)))
+		lines = append(lines, label("cpu")+cpu, label("memory")+mem+s.accentText.Render(memLine(u.mem, len(u.mem))))
+	}
+	return lines
 }
 
 // renderDiagnosisShort fits a diagnosis below the services.

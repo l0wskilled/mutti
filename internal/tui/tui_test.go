@@ -454,7 +454,7 @@ func TestDiagnosis(t *testing.T) {
 	}
 	press(w.m, "esc")
 	press(w.m, "down")
-	if !strings.Contains(w.screen(), "port  80 →") {
+	if !strings.Contains(w.screen(), "port   80 →") {
 		t.Errorf("ports of web:\n%s", w.screen())
 	}
 	if got := w.m.renderDiagnoses(nil, errors.New("docker is away")); !strings.Contains(got, "docker is away") {
@@ -585,11 +585,16 @@ func TestPalette(t *testing.T) {
 }
 
 func TestTimers(t *testing.T) {
-	defer func(r, s, f, d time.Duration) { refreshEvery, settleEvents, followLogs, toastDuration = r, s, f, d }(refreshEvery, settleEvents, followLogs, toastDuration)
-	refreshEvery, settleEvents, followLogs, toastDuration = time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond
+	defer func(r, s, f, d, p time.Duration) {
+		refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery = r, s, f, d, p
+	}(refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery)
+	refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery = time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond
 	w := setup(t)
 	if _, ok := find[tickMsg](messages(tick())); !ok {
 		t.Error("tick")
+	}
+	if _, ok := find[sampleMsg](messages(sampleTick())); !ok {
+		t.Error("sample tick")
 	}
 	if _, ok := find[toastDoneMsg](messages(w.m.setToast("x", true))); !ok {
 		t.Error("toast timer")
