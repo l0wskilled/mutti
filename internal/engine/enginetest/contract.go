@@ -219,8 +219,14 @@ func RunContract(t *testing.T, e engine.Engine, s Seeder) {
 			t.Fatal(err)
 		}
 		d, ok, err := e.InspectContainer(ctx, spec.Name)
-		if err != nil || !ok || d.ID != id || d.Name != spec.Name || d.State != "running" {
+		if err != nil || !ok || d.ID != id || d.Name != spec.Name || d.State != "running" || d.Image != image || d.Runtime.StartedAt.IsZero() {
 			t.Fatalf("inspect: %+v %v %v", d, ok, err)
+		}
+		if st, err := e.ContainerStats(ctx, id); err != nil || st.Read.IsZero() || st.MemoryLimit == 0 {
+			t.Fatalf("stats: %+v %v", st, err)
+		}
+		if _, err := e.ContainerStats(ctx, run+"-missing"); err == nil {
+			t.Fatal("stats of a missing container")
 		}
 		if _, ok, err := e.InspectContainer(ctx, run+"-missing"); ok || err != nil {
 			t.Fatalf("inspect missing: %v %v", ok, err)

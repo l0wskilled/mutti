@@ -78,6 +78,8 @@ type Engine interface {
 	StartContainer(ctx context.Context, id string) error
 	// InspectContainer returns details of a container by id or name; ok is false if missing.
 	InspectContainer(ctx context.Context, id string) (c ContainerDetails, ok bool, err error)
+	// ContainerStats samples what a container uses right now; a stopped one uses nothing.
+	ContainerStats(ctx context.Context, id string) (Stats, error)
 	// RunContainer runs a one-off container to completion, removes it and returns its exit code.
 	RunContainer(ctx context.Context, spec ContainerSpec) (exitCode int, err error)
 	// Events streams what happens to containers matching labelFilters until ctx ends. A failing
@@ -123,6 +125,7 @@ type ContainerDetails struct {
 	ID       string
 	Name     string
 	State    string
+	Image    string // as the container was created from it, e.g. "postgres:17"
 	Labels   map[string]string
 	Networks map[string][]string // network name -> extra DNS aliases
 	IPs      map[string]string   // network name -> IP address
@@ -136,6 +139,7 @@ type Runtime struct {
 	OOMKilled    bool
 	Error        string    // set when Docker could not start the container
 	RestartCount int       // restarts by the restart policy
+	StartedAt    time.Time // zero while it never started
 	FinishedAt   time.Time // zero while it never ended
 	Health       []HealthProbe
 }
@@ -145,6 +149,14 @@ type HealthProbe struct {
 	Start    time.Time
 	ExitCode int
 	Output   string
+}
+
+// Stats is one sample of what a container uses.
+type Stats struct {
+	Read        time.Time     // when the sample was taken
+	CPU         time.Duration // CPU time used since the container started, over all cores
+	Memory      uint64        // bytes in use, without the page cache the kernel can drop
+	MemoryLimit uint64        // bytes it may use, the host's memory without a limit
 }
 
 // Info describes the daemon.

@@ -36,6 +36,7 @@ type Fake struct {
 
 	runs    []engine.ContainerSpec
 	runtime map[string]engine.Runtime    // container id -> what InspectContainer reports
+	stats   map[string]engine.Stats      // container id -> what ContainerStats reports
 	files   map[string]map[string][]byte // container id -> path -> content
 	mounts  map[string][]engine.Mount
 	subs    map[*subscriber]bool
@@ -479,6 +480,12 @@ func (f *Fake) StartContainer(_ context.Context, id string) error {
 	}
 	c.State = "running"
 	f.s.Containers[c.ID] = c
+	if f.runtime == nil {
+		f.runtime = map[string]engine.Runtime{}
+	}
+	r := f.runtime[c.ID]
+	r.StartedAt = time.Now()
+	f.runtime[c.ID] = r
 	f.emit("start", c, nil)
 	return nil
 }
@@ -493,7 +500,7 @@ func (f *Fake) InspectContainer(_ context.Context, id string) (engine.ContainerD
 	if !ok {
 		return engine.ContainerDetails{}, false, nil
 	}
-	d := engine.ContainerDetails{ID: c.ID, Name: c.Name, State: c.State, Labels: maps.Clone(c.Labels), Networks: map[string][]string{}, IPs: map[string]string{}, Mounts: slices.Clone(f.mounts[c.ID]), Runtime: f.runtime[c.ID]}
+	d := engine.ContainerDetails{ID: c.ID, Name: c.Name, State: c.State, Image: f.s.Specs[c.ID].Image, Labels: maps.Clone(c.Labels), Networks: map[string][]string{}, IPs: map[string]string{}, Mounts: slices.Clone(f.mounts[c.ID]), Runtime: f.runtime[c.ID]}
 	for i, n := range c.Networks {
 		d.Networks[n] = slices.Clone(f.s.Aliases[c.ID][n])
 		if c.State == "running" {
@@ -511,6 +518,33 @@ func (f *Fake) SetRuntime(id string, r engine.Runtime) {
 		f.runtime = map[string]engine.Runtime{}
 	}
 	f.runtime[id] = r
+}
+
+// SetStats sets what ContainerStats reports for a container.
+func (f *Fake) SetStats(id string, st engine.Stats) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.stats == nil {
+		f.stats = map[string]engine.Stats{}
+	}
+	f.stats[id] = st
+}
+
+// ContainerStats reports what SetStats set, else a container that uses nothing.
+func (f *Fake) ContainerStats(_ context.Context, id string) (engine.Stats, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.fail("ContainerStats"); err != nil {
+		return engine.Stats{}, err
+	}
+	c, ok := f.findContainer(id)
+	if !ok {
+		return engine.Stats{}, fmt.Errorf("container %s not found", id)
+	}
+	if st, ok := f.stats[c.ID]; ok {
+		return st, nil
+	}
+	return engine.Stats{Read: time.Now(), MemoryLimit: 8 << 30}, nil
 }
 
 // Files returns what was copied into a container.

@@ -44,6 +44,7 @@ func TestUnreachableDaemon(t *testing.T) {
 		"CreateContainer": func() error { _, err := m.CreateContainer(ctx, ContainerSpec{Image: "busybox"}); return err },
 		"StartContainer":  func() error { return m.StartContainer(ctx, "c") },
 		"Inspect":         func() error { _, _, err := m.InspectContainer(ctx, "c"); return err },
+		"Stats":           func() error { _, err := m.ContainerStats(ctx, "c"); return err },
 		"RunContainer":    func() error { _, err := m.RunContainer(ctx, ContainerSpec{Image: "busybox"}); return err },
 		"Pause":           func() error { return m.PauseContainer(ctx, "c") },
 		"Unpause":         func() error { return m.UnpauseContainer(ctx, "c") },
@@ -132,6 +133,23 @@ func fakeDaemon(t *testing.T) *Moby {
 func TestCreateNetworkReportsExhaustedPools(t *testing.T) {
 	_, err := fakeDaemon(t).CreateNetwork(context.Background(), "n", nil)
 	if !errors.Is(err, ErrAddressPoolsExhausted) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestContainerStatsRejectsGarbage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Api-Version", "1.52")
+		_, _ = w.Write([]byte("not json"))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("DOCKER_HOST", "tcp://"+srv.Listener.Addr().String())
+	m, err := Connect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = m.Close() })
+	if _, err := m.ContainerStats(context.Background(), "c"); err == nil || !strings.Contains(err.Error(), "reading the stats") {
 		t.Fatalf("got %v", err)
 	}
 }

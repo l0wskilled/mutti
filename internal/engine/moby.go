@@ -4,9 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -321,9 +323,7 @@ func (m *Moby) InspectContainer(ctx context.Context, id string) (ContainerDetail
 	if c.State != nil {
 		d.State = string(c.State.Status)
 		d.Runtime.ExitCode, d.Runtime.OOMKilled, d.Runtime.Error = c.State.ExitCode, c.State.OOMKilled, c.State.Error
-		if t, err := time.Parse(time.RFC3339Nano, c.State.FinishedAt); err == nil && t.Year() > 1 {
-			d.Runtime.FinishedAt = t
-		}
+		d.Runtime.StartedAt, d.Runtime.FinishedAt = dockerTime(c.State.StartedAt), dockerTime(c.State.FinishedAt)
 		if c.State.Health != nil {
 			for _, h := range c.State.Health.Log {
 				d.Runtime.Health = append(d.Runtime.Health, HealthProbe{Start: h.Start, ExitCode: h.ExitCode, Output: h.Output})
@@ -331,7 +331,7 @@ func (m *Moby) InspectContainer(ctx context.Context, id string) (ContainerDetail
 		}
 	}
 	if c.Config != nil {
-		d.Labels = c.Config.Labels
+		d.Image, d.Labels = c.Config.Image, c.Config.Labels
 	}
 	if c.NetworkSettings != nil {
 		for name, ep := range c.NetworkSettings.Networks {
@@ -345,6 +345,31 @@ func (m *Moby) InspectContainer(ctx context.Context, id string) (ContainerDetail
 		d.Mounts = append(d.Mounts, Mount{Source: mp.Source, Target: mp.Destination, ReadOnly: !mp.RW, Volume: mp.Type == mount.TypeVolume})
 	}
 	return d, true, nil
+}
+
+// dockerTime parses a time of Docker's, which marks "never" with the zero year.
+func dockerTime(s string) time.Time {
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil && t.Year() > 1 {
+		return t
+	}
+	return time.Time{}
+}
+
+func (m *Moby) ContainerStats(ctx context.Context, id string) (Stats, error) {
+	res, err := m.c.ContainerStats(ctx, id, client.ContainerStatsOptions{})
+	if err != nil {
+		return Stats{}, wrap(err)
+	}
+	defer res.Body.Close()
+	var raw container.StatsResponse
+	if err := json.NewDecoder(res.Body).Decode(&raw); err != nil {
+		return Stats{}, fmt.Errorf("reading the stats of %s: %w", id, err)
+	}
+	mem := raw.MemoryStats
+	// What docker stats shows: the page cache the kernel can drop does not count, under
+	// cgroup v2 and v1.
+	cache := mem.Stats["inactive_file"] + mem.Stats["total_inactive_file"]
+	return Stats{Read: raw.Read, CPU: time.Duration(min(raw.CPUStats.CPUUsage.TotalUsage, math.MaxInt64)), Memory: mem.Usage - min(cache, mem.Usage), MemoryLimit: mem.Limit}, nil
 }
 
 func (m *Moby) RunContainer(ctx context.Context, spec ContainerSpec) (int, error) {
