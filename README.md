@@ -165,11 +165,17 @@ Otherwise it refuses to touch the host's router; `MUTTI_ROUTER_NAME`, `MUTTI_HTT
 ## Terminal UI
 
 `mutti tui` shows every instance on this machine, the services of the selected one and what is
-wrong with them, kept current as containers change. Keys act on the selected instance or service:
-start, stop, restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and
-destroy, which removes an instance whatever state it is in, also when its worktree is gone. `T`
-tidies what deleted worktrees left behind. `:` searches every mutti command, the project's own commands included, and runs it; `?`
-lists the keys.
+wrong with them, kept current as containers change. Every service shows its CPU and memory with a
+sparkline; the selected one also its image, uptime, restarts and last health check. The header
+tells whether Docker answers and the router runs.
+
+Keys act on the selected instance or service, or on the services marked with space: start, stop,
+restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and destroy, which
+removes an instance whatever state it is in, also when its worktree is gone. `T` tidies what
+deleted worktrees left behind, `/` filters the instances by name or branch. `:` searches every
+mutti command and subcommand, the project's own commands included, and runs it; `?` lists the
+keys. The mouse selects with a click and scrolls with the wheel; most terminals select text with
+shift held.
 
 ## Web UI
 
