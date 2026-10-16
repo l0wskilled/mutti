@@ -270,7 +270,7 @@ func (m *model) servicesView(w int) string {
 			mark = "✓"
 		}
 		marker := s.cursor.Render(cursor+mark) + " "
-		row := fmt.Sprintf("%s%s  %s  %s%s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), s.badge(kind).Render(fmt.Sprintf("%-10s", word)), m.usageColumns(svc.Service, w), s.faintText.Render(svc.Status))
+		row := fmt.Sprintf("%s%s  %s  %s%s", marker, name+strings.Repeat(" ", nameW-len(svc.Service)), m.badgeStyle(kind).Render(fmt.Sprintf("%-12s", m.badgeWord(kind, word))), m.usageColumns(svc.Service, w), s.faintText.Render(svc.Status))
 		if _, sick := m.diags[svc.Service]; sick {
 			row += s.errText.Render("  !")
 		}

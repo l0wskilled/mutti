@@ -130,11 +130,13 @@ type model struct {
 	events  <-chan app.InstanceEvent
 	pending bool // a refresh after events is on its way
 
-	busy    string
-	spinner spinner.Model
-	toast   string
-	toastID int
-	toastOK bool
+	busy      string
+	frame     int  // of the animations
+	animating bool // an animation frame is on its way
+	spinner   spinner.Model
+	toast     string
+	toastID   int
+	toastOK   bool
 
 	palette list.Model
 	input   textinput.Model
@@ -310,7 +312,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.gotInstances(msg)
 	case statusMsg:
 		m.gotStatus(msg)
-		return m, nil
+		return m, m.animate()
+	case animateMsg:
+		return m, m.nextFrame()
 	case eventMsg:
 		if !msg.open {
 			return m, nil
