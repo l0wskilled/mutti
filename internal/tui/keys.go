@@ -40,9 +40,21 @@ func newKeyMap() keyMap {
 	}
 }
 
-// ShortHelp is the footer: the keys that get someone going.
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Switch, k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, k.Palette, k.Help, k.Quit}
+// footer are the keys of the pane with the focus; ? and : have the rest.
+func (k keyMap) footer(focus pane, marked bool) []key.Binding {
+	hint := func(keys, desc string) key.Binding {
+		return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
+	}
+	common := []key.Binding{hint(":", "commands"), k.Help, k.Quit}
+	if focus == paneInstances {
+		return append([]key.Binding{hint("tab", "services"), k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, hint("o", "open"), hint("/", "filter")}, common...)
+	}
+	keys := []key.Binding{hint("tab", "instances"), hint("space", "mark")}
+	if marked {
+		keys = append(keys, hint("esc", "unmark"))
+	}
+	keys = append(keys, k.Start, k.Stop, k.Restart, k.Logs, k.Diagnose, hint("enter", "shell"))
+	return append(keys, common...)
 }
 
 // FullHelp is the help overlay, by topic.

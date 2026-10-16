@@ -404,7 +404,7 @@ func (m *model) forward(msg tea.Msg) tea.Cmd {
 
 func (m *model) resize(w, h int) {
 	m.width, m.height = w, h
-	m.help.SetWidth(w)
+	m.help.SetWidth(w - 1) // after the margin of the footer
 	m.palette.SetSize(min(w-8, 90), max(h-10, 5))
 	m.viewer.SetWidth(w - 4)
 	m.viewer.SetHeight(max(h-6, 3))

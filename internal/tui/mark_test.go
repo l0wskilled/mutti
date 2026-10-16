@@ -24,7 +24,7 @@ func TestMarkServices(t *testing.T) {
 		t.Errorf("target %q %v", what, services)
 	}
 	screen := w.screen()
-	for _, want := range []string{" ✓ web", "›  db", " ✓ cache", "2 marked · u/s/r, l and i act on them · esc unmarks"} {
+	for _, want := range []string{" ✓ web", "›  db", " ✓ cache", "2 marked", "esc unmark"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("no %q in\n%s", want, screen)
 		}

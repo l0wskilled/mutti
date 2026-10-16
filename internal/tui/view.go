@@ -99,7 +99,7 @@ func lastWord(detail string) string {
 }
 
 func (m *model) footer() string {
-	return " " + m.help.ShortHelpView(m.keys.ShortHelp())
+	return " " + m.help.ShortHelpView(m.keys.footer(m.focus, len(m.marks()) > 0))
 }
 
 func (m *model) mainView(h int) string {
@@ -120,34 +120,9 @@ func (m *model) mainView(h int) string {
 	}
 	// Width and height count the border.
 	return lipgloss.JoinHorizontal(lipgloss.Top,
-		left.Width(lw).Height(h).Render(clip(m.withCheatSheet(m.instancesView(lw-4), h-2), h-2)),
+		left.Width(lw).Height(h).Render(clip(m.instancesView(lw-4), h-2)),
 		right.Width(rw).Height(h).Render(clip(m.servicesView(rw-4), h-2)),
 	)
-}
-
-// withCheatSheet puts what mutti can do below the instances, where there is room.
-func (m *model) withCheatSheet(instances string, h int) string {
-	s := m.styles
-	k := func(key, what string) string { return s.key.Render(key) + " " + s.muted.Render(what) }
-	sheet := []string{
-		s.muted.Render("WHAT YOU CAN DO"),
-		s.faintText.Render("instance, or the selected service"),
-		"  " + k("u", "start") + "  " + k("s", "stop") + "  " + k("r", "restart"),
-		"  " + k("l", "logs") + "  " + k("i", "diagnose") + "  " + k("o", "open"),
-		s.faintText.Render("service"),
-		"  " + k("enter", "shell") + "  " + k("e", "exec") + "  " + k("y", "copy URL"),
-		s.faintText.Render("instance"),
-		"  " + k("d", "down") + "  " + k("R", "reset") + "  " + k("X", "destroy"),
-		"  " + k("n", "new worktree") + "  " + k("T", "tidy"),
-		s.faintText.Render("everything else"),
-		"  " + k(":", "search every mutti command") + "  " + k("/", "filter"),
-		"  " + k("?", "help"),
-	}
-	free := h - lipgloss.Height(instances) - len(sheet)
-	if free < 1 {
-		return instances
-	}
-	return instances + strings.Repeat("\n", free) + strings.Join(sheet, "\n")
 }
 
 // dockerDown reports whether err says that Docker does not answer.
@@ -177,10 +152,7 @@ func (m *model) welcome() string {
 	return s.overlay.Render(strings.Join([]string{
 		s.renderLogo() + s.title.Render(" has no instances yet"),
 		"",
-		s.muted.Render("In a project with a Compose file, start one:"),
-		s.accentText.Render("  mutti up"),
-		"",
-		s.muted.Render("Press ") + s.key.Render(":") + s.muted.Render(" to see everything mutti does."),
+		s.accentText.Render("mutti up") + s.muted.Render(" in a project with a Compose file starts one."),
 	}, "\n"))
 }
 
@@ -303,14 +275,16 @@ func (m *model) usageColumns(service string, w int) string {
 func (m *model) detailView(w int) string {
 	s := m.styles
 	if marks := m.marks(); len(marks) > 0 && m.focus == paneServices {
-		return s.accentText.Render(fmt.Sprintf("%d marked", len(marks))) + s.muted.Render(" · u/s/r, l and i act on them · esc unmarks")
+		return s.accentText.Render(fmt.Sprintf("%d marked", len(marks)))
 	}
 	svc := m.service()
 	if svc == "" {
-		if n := len(m.diags); n > 0 {
-			return s.errText.Render(fmt.Sprintf("%d service(s) need care", n)) + s.muted.Render(" · tab to pick one, i to diagnose")
+		if n := len(m.diags); n == 1 {
+			return s.errText.Render("1 service needs care")
+		} else if n > 1 {
+			return s.errText.Render(fmt.Sprintf("%d services need care", n))
 		}
-		return s.muted.Render("tab: pick a service · enter: shell · u/s/r: start, stop, restart")
+		return ""
 	}
 	lines := m.facts(svc)
 	if d, ok := m.diags[svc]; ok {
@@ -327,7 +301,6 @@ func (m *model) detailView(w int) string {
 			lines = append(lines, s.muted.Render(fmt.Sprintf("%-7s%d → ", "port", p.ContainerPort))+p.Address)
 		}
 	}
-	lines = append(lines, s.muted.Render("enter: shell · e: exec · l: logs · i: diagnose"))
 	return strings.Join(lines, "\n")
 }
 

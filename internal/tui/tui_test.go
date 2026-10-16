@@ -153,7 +153,7 @@ func TestMainViewShowsInstancesAndServices(t *testing.T) {
 		t.Fatalf("selection %+v %+v", c, w.m.status)
 	}
 	screen := w.screen()
-	for _, want := range []string{"◆ mutti", "1 instances · 1 running", "INSTANCES", "shop", "1/1", "web", "running", "WHAT YOU CAN DO", "https://shop.localhost"} {
+	for _, want := range []string{"◆ mutti", "1 instances · 1 running", "INSTANCES", "shop", "1/1", "web", "running", "tab services", "https://shop.localhost"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("no %q in\n%s", want, screen)
 		}
@@ -174,7 +174,7 @@ func TestNavigationAndServiceDetails(t *testing.T) {
 		t.Fatalf("tab: %v %q", w.m.focus, w.m.service())
 	}
 	press(w.m, "down", "up", "k", "j")
-	if w.m.svcCursor != 0 || !strings.Contains(w.screen(), "enter: shell · e: exec") {
+	if w.m.svcCursor != 0 || !strings.Contains(w.screen(), "tab instances • space mark • u start") {
 		t.Errorf("services: %d\n%s", w.m.svcCursor, w.screen())
 	}
 	if cmd := press(w.m, "enter"); cmd == nil {
@@ -445,7 +445,7 @@ func TestDiagnosis(t *testing.T) {
 	w.App.Reconcile(context.Background()) //nolint:errcheck // only the model matters
 	feed[statusMsg](t, w.m, w.m.refresh())
 	screen := w.screen()
-	if !strings.Contains(screen, "1 service(s) need care") || !strings.Contains(screen, "profile tools · optional") || !strings.Contains(screen, "unhealthy") {
+	if !strings.Contains(screen, "1 service needs care") || !strings.Contains(screen, "profile tools · optional") || !strings.Contains(screen, "unhealthy") {
 		t.Fatalf("status with trouble:\n%s", screen)
 	}
 	press(w.m, "tab")
@@ -618,11 +618,6 @@ func TestCornerCases(t *testing.T) {
 	if press(w.m, "enter") != nil || w.m.move(1) != nil {
 		t.Error("no services")
 	}
-	// No room for the cheat sheet.
-	w.m.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
-	if strings.Contains(w.screen(), "WHAT YOU CAN DO") {
-		t.Errorf("small:\n%s", w.screen())
-	}
 	// Other messages go to the prompt.
 	press(w.m, "n")
 	w.m.Update(tea.PasteMsg{Content: "feature"})
@@ -667,8 +662,8 @@ func TestHelpAndKeys(t *testing.T) {
 	if press(w.m, "Z") != nil && len(messages(press(w.m, "Z"))) > 0 {
 		t.Error("unknown key")
 	}
-	if len(w.m.keys.ShortHelp()) == 0 {
-		t.Error("short help")
+	if len(w.m.keys.footer(paneServices, true)) <= len(w.m.keys.footer(paneServices, false)) {
+		t.Error("esc unmarks shows with marks only")
 	}
 }
 
