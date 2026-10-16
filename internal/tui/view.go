@@ -15,6 +15,7 @@ import (
 func (m *model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	v.WindowTitle = "mutti"
 	return v
 }
@@ -79,6 +80,7 @@ func (m *model) mainView(h int) string {
 	}
 	lw := min(max(m.width/3, 28), 44)
 	rw := m.width - lw
+	m.split = lw
 	left, right := m.styles.pane, m.styles.pane
 	if m.focus == paneInstances {
 		left = m.styles.focusedPane
@@ -133,6 +135,7 @@ func (m *model) instancesView(w int) string {
 	s := m.styles
 	lines := []string{s.muted.Render("INSTANCES"), ""}
 	shown := m.shown()
+	m.instanceAt = map[int]string{}
 	if m.mode == modeFilter || m.filter.Value() != "" {
 		count := s.faintText.Render(fmt.Sprintf("%d of %d", len(shown), len(m.instances)))
 		lines[1] = padBetween(trunc(m.filter.View(), w-lipgloss.Width(count)-1), count, w)
@@ -148,6 +151,7 @@ func (m *model) instancesView(w int) string {
 		}
 		count := s.muted.Render(fmt.Sprintf("%d/%d", i.Running, i.Total))
 		first := marker + s.dot(i.Status) + " " + name
+		m.instanceAt[len(lines)], m.instanceAt[len(lines)+1] = i.Path, i.Path
 		lines = append(lines, padBetween(trunc(first, w-lipgloss.Width(count)-1), count, w))
 		detail := i.Branch
 		if i.Orphaned {
@@ -182,6 +186,7 @@ func (m *model) servicesView(w int) string {
 		return strings.Join(append(lines, s.muted.Render(m.spinner.View()+" loading…")), "\n")
 	}
 	svcs := m.services()
+	m.serviceAt = map[int]int{}
 	nameW := 0
 	for _, svc := range svcs {
 		nameW = max(nameW, len(svc.Service))
@@ -205,6 +210,7 @@ func (m *model) servicesView(w int) string {
 		if _, sick := m.diags[svc.Service]; sick {
 			row += s.errText.Render("  !")
 		}
+		m.serviceAt[len(lines)] = i
 		lines = append(lines, trunc(row, w))
 	}
 	lines = append(lines, "", m.detailView(w))

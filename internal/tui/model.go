@@ -117,9 +117,13 @@ type model struct {
 	statusErr error
 	listErr   error
 	svcCursor int
-	marked    map[string]bool               // services the actions act on together
-	details   map[string]app.ServiceDetails // by service
-	usage     map[string]*usage             // by service, while it runs
+	marked    map[string]bool // services the actions act on together
+	// Where the last render put the instances and services, for the mouse.
+	instanceAt map[int]string                // line of the pane -> instance path
+	serviceAt  map[int]int                   // line of the pane -> service index
+	split      int                           // the column the services pane starts at
+	details    map[string]app.ServiceDetails // by service
+	usage      map[string]*usage             // by service, while it runs
 
 	events  <-chan app.InstanceEvent
 	pending bool // a refresh after events is on its way
@@ -348,6 +352,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case diagnosisMsg:
 		m.openViewer(modeDiagnose, msg.title, m.renderDiagnoses(msg.diags, msg.err))
 		return m, nil
+	case tea.MouseClickMsg:
+		return m, m.click(msg.Mouse())
+	case tea.MouseWheelMsg:
+		if m.mode == modeMain {
+			return m, m.wheel(msg.Mouse())
+		}
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c":
