@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -138,10 +137,8 @@ func (m *model) actions() []action {
 			}
 		})},
 		{k.Logs, "Logs", "follow the logs of the instance or the selected service", needWorktree(func() tea.Cmd {
-			m.logsOf = strings.Join(services, " ")
-			m.logsGen++
-			m.openViewer(modeLogs, "Logs of "+what, "loading…")
-			return tea.Batch(m.loadLogs(), m.logsTick())
+			m.openViewer(modeLogs, "Logs of "+what, "")
+			return m.startLogs(m.ctx, services)
 		})},
 		{k.Diagnose, "Diagnose", "explain what is wrong: health checks, exit codes, last logs", needWorktree(func() tea.Cmd {
 			a, _ := m.app()
@@ -303,65 +300,17 @@ func (m *model) openViewer(md mode, title, text string) {
 }
 
 func (m *model) viewerKey(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "esc", "q":
+	if k := msg.String(); (k == "esc" || k == "q") && !m.logFiltering {
 		m.mode = modeMain
-		m.logsGen++
+		m.stopLogs()
 		return nil
-	case "f":
-		if m.mode == modeLogs {
-			m.follow = !m.follow
-			if m.follow {
-				m.viewer.GotoBottom()
-				return m.logsTick()
-			}
-		}
-		return nil
+	}
+	if m.mode == modeLogs {
+		return m.logsKey(msg)
 	}
 	var cmd tea.Cmd
 	m.viewer, cmd = m.viewer.Update(msg)
 	return cmd
-}
-
-func (m *model) loadLogs() tea.Cmd {
-	path, svc := m.selected, m.logsOf
-	a, out := m.app()
-	return func() tea.Msg {
-		args := []string{"logs", "--no-color", "--timestamps", "--tail", fmt.Sprint(logLines)}
-		args = append(args, strings.Fields(svc)...)
-		_, _ = a.ComposePassthrough(m.ctx, path, app.Selection{}, args)
-		return logsMsg{path: path, service: svc, text: out.String()}
-	}
-}
-
-func (m *model) logsTick() tea.Cmd {
-	gen := m.logsGen
-	return tea.Tick(followLogs, func(time.Time) tea.Msg { return logsTickMsg{gen: gen} })
-}
-
-// logLine splits "web-1  | 2026-...Z message" into its parts.
-var logLine = regexp.MustCompile(`^(\S+\s*\|\s)(\S+Z\s)?(.*)$`)
-
-// colorLogs sets the service and the time apart, and shows errors and warnings in color.
-func (m *model) colorLogs(text string) string {
-	s := m.styles
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
-	for i, l := range lines {
-		msg := s.title.Faint(false).Bold(false)
-		lower := strings.ToLower(l)
-		switch {
-		case strings.Contains(lower, "error"), strings.Contains(lower, "fatal"), strings.Contains(lower, "panic"), strings.Contains(lower, "exception"):
-			msg = s.errText
-		case strings.Contains(lower, "warn"):
-			msg = msg.Foreground(s.amber)
-		}
-		if p := logLine.FindStringSubmatch(l); p != nil {
-			lines[i] = s.accentText.Render(p[1]) + s.faintText.Render(p[2]) + msg.Render(p[3])
-		} else {
-			lines[i] = msg.Render(l)
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 // renderDiagnoses is the text of the diagnosis view.

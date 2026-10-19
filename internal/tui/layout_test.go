@@ -92,3 +92,13 @@ func TestOptionalBadges(t *testing.T) {
 		}
 	}
 }
+
+func TestDetailBoxWithDiagnosis(t *testing.T) {
+	w := setup(t)
+	press(w.m, "tab")
+	w.m.details["web"] = app.ServiceDetails{Image: "nginx:1"}
+	w.m.diags["web"] = app.Diagnosis{Service: "web", Problem: "exited with 1"}
+	if s := w.screen(); !strings.Contains(s, "image  nginx:1") || !strings.Contains(s, "exited with 1") {
+		t.Errorf("facts and diagnosis:\n%s", s)
+	}
+}

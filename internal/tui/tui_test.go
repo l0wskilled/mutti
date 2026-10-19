@@ -380,55 +380,6 @@ func TestOpenCopyAndURL(t *testing.T) {
 	}
 }
 
-func TestLogsView(t *testing.T) {
-	w := setup(t)
-	w.Compose.Stdout = func(args []string) string {
-		if args[0] == "logs" {
-			return "web-1  | 2026-01-01T00:00:00Z hello\nweb-1  | 2026-01-01T00:00:01Z ERROR boom\nweb-1  | 2026-01-01T00:00:02Z warn: slow\nplain line\n"
-		}
-		return ""
-	}
-	press(w.m, "tab")
-	cmd := press(w.m, "l")
-	if w.m.mode != modeLogs || w.m.logsOf != "web" {
-		t.Fatalf("logs: %v %q", w.m.mode, w.m.logsOf)
-	}
-	logs := feed[logsMsg](t, w.m, cmd)
-	if !strings.Contains(w.screen(), "Logs of web") || !strings.Contains(w.screen(), "ERROR boom") || !strings.Contains(w.screen(), "follow (on)") {
-		t.Fatalf("logs:\n%s", w.screen())
-	}
-	// Logs of another service than shown are dropped; a stale tick does nothing.
-	w.m.Update(logsMsg{service: "db", text: "other"})
-	if w.update(logsTickMsg{gen: w.m.logsGen - 1}) != nil {
-		t.Error("stale tick")
-	}
-	if c := w.update(logsTickMsg{gen: w.m.logsGen}); c == nil {
-		t.Error("following")
-	}
-	press(w.m, "f")
-	if w.m.follow || !strings.Contains(w.screen(), "follow (off)") {
-		t.Error("follow off")
-	}
-	w.m.Update(logs)
-	if w.update(logsTickMsg{gen: w.m.logsGen}) != nil {
-		t.Error("not following")
-	}
-	if cmd := press(w.m, "f"); !w.m.follow || cmd == nil {
-		t.Error("follow on")
-	}
-	press(w.m, "down")
-	w.m.Update(tea.MouseWheelMsg{})
-	press(w.m, "q")
-	if w.m.mode != modeMain {
-		t.Error("q leaves")
-	}
-	// f in the diagnosis view does nothing.
-	w.m.openViewer(modeDiagnose, "x", "y")
-	if press(w.m, "f"); w.m.mode != modeDiagnose {
-		t.Error("f in diagnose")
-	}
-}
-
 func TestDiagnosis(t *testing.T) {
 	w := setup(t)
 	id := w.Engine.AddContainer(engine.Container{State: "running", Status: "Up 1 minute (unhealthy)", Labels: map[string]string{engine.LabelComposeProject: "shop", engine.LabelComposeService: "db"}})
@@ -589,10 +540,10 @@ func TestPalette(t *testing.T) {
 }
 
 func TestTimers(t *testing.T) {
-	defer func(r, s, f, d, p time.Duration) {
-		refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery = r, s, f, d, p
-	}(refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery)
-	refreshEvery, settleEvents, followLogs, toastDuration, sampleEvery = time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond
+	defer func(r, s, d, p time.Duration) {
+		refreshEvery, settleEvents, toastDuration, sampleEvery = r, s, d, p
+	}(refreshEvery, settleEvents, toastDuration, sampleEvery)
+	refreshEvery, settleEvents, toastDuration, sampleEvery = time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond
 	w := setup(t)
 	if _, ok := find[tickMsg](messages(tick())); !ok {
 		t.Error("tick")
@@ -602,9 +553,6 @@ func TestTimers(t *testing.T) {
 	}
 	if _, ok := find[toastDoneMsg](messages(w.m.setToast("x", true))); !ok {
 		t.Error("toast timer")
-	}
-	if _, ok := find[logsTickMsg](messages(w.m.logsTick())); !ok {
-		t.Error("logs timer")
 	}
 	if _, ok := find[refreshMsg](messages(w.update(eventMsg{open: true}))); !ok {
 		t.Error("settle timer")

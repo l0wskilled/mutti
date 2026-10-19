@@ -45,11 +45,8 @@ const (
 var (
 	refreshEvery  = 5 * time.Second        // statuses age ("Up 3 minutes") and health changes
 	settleEvents  = 300 * time.Millisecond // a burst of events causes one refresh
-	followLogs    = 2 * time.Second
 	toastDuration = 4 * time.Second
 )
-
-const logLines = 300
 
 // Messages.
 type (
@@ -74,10 +71,6 @@ type (
 		text, output, path string
 		err                error
 	}
-	logsMsg struct {
-		path, service, text string
-	}
-	logsTickMsg  struct{ gen int }
 	diagnosisMsg struct {
 		title string
 		diags []app.Diagnosis
@@ -146,9 +139,17 @@ type model struct {
 
 	viewer    viewport.Model // logs and diagnoses
 	viewTitle string
-	logsOf    string // services of the logs view, space-separated, "" for all
-	follow    bool
-	logsGen   int
+
+	// The logs view: the lines so far of the stream it follows.
+	logLines     []string
+	logsGen      int // of the stream the view shows
+	logsCh       <-chan logChunk
+	logsCancel   context.CancelFunc
+	logsEnded    bool
+	logsErr      error
+	follow       bool // keep the newest line in view
+	logFilter    textinput.Model
+	logFiltering bool
 }
 
 func newModel(ctx context.Context, opts Options) *model {
@@ -157,6 +158,9 @@ func newModel(ctx context.Context, opts Options) *model {
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.MiniDot))
 	m.input = textinput.New()
 	m.input.Prompt = "› "
+	m.logFilter = textinput.New()
+	m.logFilter.Prompt = "/ "
+	m.logFilter.Placeholder = "text in the line"
 	m.filter = textinput.New()
 	m.filter.Prompt = "/ "
 	m.filter.Placeholder = "name or branch"
@@ -351,20 +355,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setToast(msg.err.Error(), false)
 		}
 		return m, tea.Batch(tea.SetClipboard(msg.url), m.setToast("copied "+msg.url, true))
-	case logsMsg:
-		if m.mode == modeLogs && msg.service == m.logsOf {
-			atBottom := m.viewer.AtBottom()
-			m.viewer.SetContent(m.colorLogs(msg.text))
-			if atBottom || m.follow {
-				m.viewer.GotoBottom()
-			}
-		}
-		return m, nil
-	case logsTickMsg:
-		if m.mode != modeLogs || msg.gen != m.logsGen || !m.follow {
-			return m, nil
-		}
-		return m, tea.Batch(m.loadLogs(), m.logsTick())
+	case logLinesMsg:
+		return m, m.gotLogLines(msg)
 	case diagnosisMsg:
 		m.openViewer(modeDiagnose, msg.title, m.renderDiagnoses(msg.diags, msg.err))
 		return m, nil
@@ -396,7 +388,14 @@ func (m *model) forward(msg tea.Msg) tea.Cmd {
 		m.input, cmd = m.input.Update(msg)
 	case modeFilter:
 		m.filter, cmd = m.filter.Update(msg)
-	case modeLogs, modeDiagnose:
+	case modeLogs:
+		if m.logFiltering {
+			m.logFilter, cmd = m.logFilter.Update(msg)
+			m.renderLogs()
+			return cmd
+		}
+		return m.scrollLogs(msg)
+	case modeDiagnose:
 		m.viewer, cmd = m.viewer.Update(msg)
 	}
 	return cmd

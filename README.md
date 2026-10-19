@@ -173,7 +173,8 @@ focus. A terminal narrower than 90 columns shows one pane at a time.
 Keys act on the selected instance or service, or on the services marked with space: up, stop,
 restart, logs, diagnose, shell, exec, open, copy URL, new worktree, down, reset and destroy, which
 removes an instance whatever state it is in, also when its worktree is gone. `T` tidies what
-deleted worktrees left behind, `/` filters the instances by name or branch. `:` searches every
+deleted worktrees left behind, `/` filters the instances by name or branch. Logs stream as the
+services print them, and `/` there keeps the lines with the text typed. `:` searches every
 mutti command and subcommand, the project's own commands included, and runs it; `?` lists the
 keys. The mouse selects with a click and scrolls with the wheel; most terminals select text with
 shift held.

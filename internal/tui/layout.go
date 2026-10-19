@@ -22,7 +22,10 @@ func (m *model) footer() string {
 		if m.follow {
 			follow = "on"
 		}
-		keys = []key.Binding{hint("↑/↓", "scroll"), hint("f", "follow ("+follow+")"), hint("esc", "back")}
+		keys = []key.Binding{hint("↑/↓", "scroll"), hint("/", "filter"), hint("f", "follow ("+follow+")"), hint("esc", "back")}
+		if m.logFiltering {
+			keys = []key.Binding{hint("enter", "keep"), hint("esc", "clear")}
+		}
 	case modeDiagnose:
 		keys = []key.Binding{hint("↑/↓", "scroll"), hint("esc", "back")}
 	case modeFilter:
@@ -355,6 +358,17 @@ func (m *model) detailView(w int) (string, string) {
 }
 
 func (m *model) viewerView(h int) string {
-	m.viewer.SetHeight(max(h-2, 1))
-	return m.box(m.viewTitle, m.width, h, m.viewer.View(), true)
+	if m.mode != modeLogs {
+		m.viewer.SetHeight(max(h-2, 1))
+		return m.box(m.viewTitle, m.width, h, m.viewer.View(), true)
+	}
+	body, viewH := "", h-2
+	if m.logFiltering || m.logFilter.Value() != "" {
+		body, viewH = m.logFilter.View()+"\n", viewH-1
+	}
+	m.viewer.SetHeight(max(viewH, 1))
+	if m.follow { // the height is only known now
+		m.viewer.GotoBottom()
+	}
+	return m.box(m.logsTitle(), m.width, h, body+m.viewer.View(), true)
 }

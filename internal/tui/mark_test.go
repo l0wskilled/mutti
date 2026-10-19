@@ -30,7 +30,7 @@ func TestMarkServices(t *testing.T) {
 		}
 	}
 	// Logs follow every marked service.
-	feed[logsMsg](t, w.m, press(w.m, "l"))
+	w.follow(t, press(w.m, "l"))
 	if run := w.Compose.Runs[len(w.Compose.Runs)-1]; !reflect.DeepEqual(run[len(run)-2:], []string{"web", "cache"}) {
 		t.Errorf("logs %v", run)
 	}
