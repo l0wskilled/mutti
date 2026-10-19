@@ -58,7 +58,7 @@ func (a *App) Diagnose(ctx context.Context, dir string, services ...string) ([]D
 	if len(picked) == 0 {
 		return []Diagnosis{}, nil
 	}
-	spec, err := a.prepare(ctx, inst, a.lastSelection(inst.Name))
+	spec, err := a.prepare(ctx, inst, a.lastSelection(inst))
 	if err != nil {
 		return nil, err
 	}

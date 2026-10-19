@@ -14,6 +14,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose"
 	"github.com/l0wskilled/mutti/internal/compose/composetest"
 	"github.com/l0wskilled/mutti/internal/engine"
+	"github.com/l0wskilled/mutti/internal/project"
 )
 
 func hookModel() *compose.Model {
@@ -37,7 +38,7 @@ func TestUpRunsComposeAndHooks(t *testing.T) {
 		t.Fatalf("result %+v", res)
 	}
 
-	override := filepath.Join(h.app.Dirs.InstanceDir("shop"), "override.yml")
+	override := filepath.Join(root, ".mutti", "local", "compose.yml")
 	content, err := os.ReadFile(override)
 	if err != nil || !strings.Contains(string(content), `"web":`) {
 		t.Fatalf("override: %q %v", content, err)
@@ -81,7 +82,7 @@ func TestUpWritesRoutesAndIngressIntoOverride(t *testing.T) {
 	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	content, _ := os.ReadFile(filepath.Join(h.app.Dirs.InstanceDir("shop"), "override.yml"))
+	content, _ := os.ReadFile(filepath.Join(root, ".mutti", "local", "compose.yml"))
 	for _, want := range []string{
 		`"mutti.instance": "shop"`, `"mutti.hostname": "shop.localhost"`,
 		`"mutti.route.hosts": "shop.localhost"`, `"mutti.route.port": "80"`,
@@ -111,7 +112,7 @@ func TestUpWithOverlay(t *testing.T) {
 	if _, err := h.app.Up(ctx, root, UpOptions{Selection: Selection{Overlays: []string{"e2e"}}}); err != nil {
 		t.Fatal(err)
 	}
-	content, err := os.ReadFile(filepath.Join(h.app.Dirs.InstanceDir("shop"), "override-e2e.yml"))
+	content, err := os.ReadFile(filepath.Join(root, ".mutti", "local", "compose+e2e.yml"))
 	if err != nil || !strings.Contains(string(content), `"runner":`) {
 		t.Fatalf("overlay override: %q %v", content, err)
 	}
@@ -247,15 +248,14 @@ func (s *startFailsAfter) Run(c context.Context, sp compose.Spec, io compose.IO,
 func TestPrepareFileErrors(t *testing.T) {
 	root := newRepo(t, "shop")
 
-	t.Run("state dir not creatable", func(t *testing.T) {
+	t.Run(".mutti/local not creatable", func(t *testing.T) {
 		h := newHarness(t, webModel())
-		file := filepath.Join(t.TempDir(), "file")
-		writeFile(t, file, "")
-		h.app.Dirs.State = filepath.Join(file, "state")
 		inst, err := h.app.Resolve(ctx, root)
 		if err != nil {
 			t.Fatal(err)
 		}
+		inst.Files.Dir = filepath.Join(t.TempDir(), "file")
+		writeFile(t, filepath.Join(inst.Files.Dir, ".mutti", "local"), "")
 		if _, err := h.app.prepare(ctx, inst, Selection{}); err == nil {
 			t.Fatal("want error")
 		}
@@ -266,7 +266,7 @@ func TestPrepareFileErrors(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.MkdirAll(filepath.Join(h.app.Dirs.InstanceDir("shop"), "override.yml"), 0o755); err != nil {
+		if err := os.MkdirAll(overrideFile(inst, nil), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := h.app.prepare(ctx, inst, Selection{}); err == nil {
@@ -530,7 +530,7 @@ func TestCommandsUseTheLastSelection(t *testing.T) {
 	if _, err := h.app.Reset(ctx, root, UpOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := h.app.lastSelection("shop"); !slices.Equal(got.Overlays, []string{"e2e"}) {
+	if got := h.app.lastSelection(&Instance{Files: project.Files{Dir: root}}); !slices.Equal(got.Overlays, []string{"e2e"}) {
 		t.Errorf("after reset: %+v", got)
 	}
 	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
@@ -546,8 +546,9 @@ func TestCommandsUseTheLastSelection(t *testing.T) {
 
 func TestDamagedSelectionMeansNone(t *testing.T) {
 	h := newHarness(t, webModel())
-	writeFile(t, h.app.selectionFile("shop"), "{nope")
-	if got := h.app.lastSelection("shop"); !got.empty() {
+	inst := &Instance{Files: project.Files{Dir: t.TempDir()}}
+	writeFile(t, selectionFile(inst), "{nope")
+	if got := h.app.lastSelection(inst); !got.empty() {
 		t.Fatalf("got %+v", got)
 	}
 }
@@ -555,7 +556,7 @@ func TestDamagedSelectionMeansNone(t *testing.T) {
 func TestUpFailsWhenTheSelectionCannotBeSaved(t *testing.T) {
 	root := newRepo(t, "shop")
 	h := newHarness(t, webModel())
-	if err := os.MkdirAll(h.app.selectionFile("shop"), 0o700); err != nil {
+	if err := os.MkdirAll(selectionFile(&Instance{Files: project.Files{Dir: root}}), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.app.Up(ctx, root, UpOptions{}); err == nil {
@@ -609,8 +610,8 @@ func TestOverlaySetsGetOwnOverrides(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"override-a+b.yml", "override-a-b.yml"} {
-		if _, err := os.Stat(filepath.Join(h.app.Dirs.InstanceDir("shop"), name)); err != nil {
+	for _, name := range []string{"compose+a+b.yml", "compose+a-b.yml"} {
+		if _, err := os.Stat(filepath.Join(root, ".mutti", "local", name)); err != nil {
 			t.Error(err)
 		}
 	}

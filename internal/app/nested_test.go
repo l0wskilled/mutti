@@ -46,7 +46,7 @@ func TestNestedUpTranslatesPaths(t *testing.T) {
 	if res.Instance.HostPath != "/host"+root {
 		t.Fatalf("host path %q", res.Instance.HostPath)
 	}
-	override, _ := os.ReadFile(filepath.Join(h.app.Dirs.InstanceDir("shop"), "override.yml"))
+	override, _ := os.ReadFile(filepath.Join(root, ".mutti", "local", "compose.yml"))
 	for _, want := range []string{
 		`source: "/host` + root + `/www"`, `target: "/www"`, "read_only: true",
 		"create_host_path: true", `propagation: "rprivate"`, `selinux: "z"`,
@@ -77,7 +77,7 @@ func TestNestedKeepsBindsWrittenWithTheHostPath(t *testing.T) {
 	if _, err := h.app.Up(ctx, root, UpOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	override, _ := os.ReadFile(filepath.Join(h.app.Dirs.InstanceDir("shop"), "override.yml"))
+	override, _ := os.ReadFile(filepath.Join(root, ".mutti", "local", "compose.yml"))
 	if !strings.Contains(string(override), `source: "/host`+root+`/src"`) {
 		t.Errorf("override:\n%s", override)
 	}

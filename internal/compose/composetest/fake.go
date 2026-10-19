@@ -192,11 +192,11 @@ type override struct {
 	fixed    map[string]map[uint16]uint16 // per service: container port -> published host port
 }
 
-// readOverride reads the generated override among files (the one under a "mutti" state dir).
+// readOverride reads the generated override among files (the one in a .mutti/local).
 func readOverride(files []string) (override, error) {
 	o := override{labels: map[string]map[string]string{}, fixed: map[string]map[uint16]uint16{}}
 	for _, path := range files {
-		if !strings.Contains(path, "/instances/") {
+		if !strings.Contains(path, "/.mutti/local/") {
 			continue
 		}
 		b, err := os.ReadFile(path)

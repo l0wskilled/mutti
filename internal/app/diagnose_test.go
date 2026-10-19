@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/l0wskilled/mutti/internal/engine"
+	"github.com/l0wskilled/mutti/internal/project"
 )
 
 func TestDiagnoseExplainsWhatIsWrong(t *testing.T) {
@@ -115,7 +116,7 @@ func TestDiagnoseFailures(t *testing.T) {
 		t.Fatalf("inspect: %v", err)
 	}
 	h.eng.FailOn = nil
-	writeFile(t, h.app.selectionFile("shop"), `{"overlays":["gone"]}`)
+	writeFile(t, selectionFile(&Instance{Files: project.Files{Dir: root}}), `{"overlays":["gone"]}`)
 	if _, err := h.app.Diagnose(ctx, root, "web"); err == nil {
 		t.Fatal("an overlay the project no longer has: want error")
 	}

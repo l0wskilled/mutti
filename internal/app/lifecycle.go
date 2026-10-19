@@ -13,6 +13,7 @@ import (
 
 	"github.com/l0wskilled/mutti/internal/compose"
 	"github.com/l0wskilled/mutti/internal/engine"
+	"github.com/l0wskilled/mutti/internal/identity"
 	"github.com/l0wskilled/mutti/internal/project"
 )
 
@@ -25,20 +26,20 @@ type Selection struct {
 
 func (s Selection) empty() bool { return len(s.Overlays) == 0 && len(s.Profiles) == 0 }
 
-func (a *App) selectionFile(instance string) string {
-	return filepath.Join(a.Dirs.InstanceDir(instance), "selection.json")
+func selectionFile(inst *Instance) string {
+	return filepath.Join(filepath.Dir(overrideFile(inst, nil)), "selection.json")
 }
 
-// saveSelection records the selection an instance was started with.
+// saveSelection records the selection an instance was started with, next to its override.
 func (a *App) saveSelection(inst *Instance, sel Selection) error {
 	data, _ := json.Marshal(sel) // a struct of strings always marshals
-	return os.WriteFile(a.selectionFile(inst.Name), data, 0o600)
+	return os.WriteFile(selectionFile(inst), data, 0o600)
 }
 
 // lastSelection is the selection the instance was last started with, or none.
-func (a *App) lastSelection(instance string) Selection {
+func (a *App) lastSelection(inst *Instance) Selection {
 	var sel Selection
-	if data, err := os.ReadFile(a.selectionFile(instance)); err == nil {
+	if data, err := os.ReadFile(selectionFile(inst)); err == nil {
 		_ = json.Unmarshal(data, &sel) // a damaged file means no selection
 	}
 	return sel
@@ -59,12 +60,7 @@ func (a *App) prepare(ctx context.Context, inst *Instance, sel Selection) (compo
 		}
 	}
 
-	// "+" is not allowed in overlay names, so every set of overlays gets a file of its own.
-	name := "override.yml"
-	if len(sel.Overlays) > 0 {
-		name = "override-" + strings.Join(sel.Overlays, "+") + ".yml"
-	}
-	path := filepath.Join(a.Dirs.InstanceDir(inst.Name), name)
+	path := overrideFile(inst, sel.Overlays)
 	rs, err := a.routerSettings()
 	if err != nil {
 		return compose.Spec{}, err
@@ -87,9 +83,12 @@ func (a *App) prepare(ctx context.Context, inst *Instance, sel Selection) (compo
 		return compose.Spec{}, err
 	}
 	content := compose.RenderOverride(m, compose.Override{
-		Network: ingressNetwork(inst.Name), CommonLabels: common, Labels: perService, FixedPorts: fixed, Binds: binds,
+		Name: inst.Name, Network: ingressNetwork(inst.Name), CommonLabels: common, Labels: perService, FixedPorts: fixed, Binds: binds,
 	})
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if _, err := localDir(inst); err != nil {
+		return compose.Spec{}, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // .mutti/ is part of the user's repo
 		return compose.Spec{}, err
 	}
 	// Replaced in one step: another mutti may be running Compose on it right now.
@@ -98,6 +97,32 @@ func (a *App) prepare(ctx context.Context, inst *Instance, sel Selection) (compo
 	}
 	spec.Files = append(spec.Files, path)
 	return spec, nil
+}
+
+// overrideFile is where the override for a set of overlays lives: next to the project, in its
+// .mutti/local with what else mutti keeps per worktree. The instance's own file is
+// .mutti/local/compose.yml; "+" is not allowed in overlay names, so every set of overlays gets a
+// file of its own, and a run's instance a directory of its own.
+func overrideFile(inst *Instance, overlays []string) string {
+	dir := filepath.Join(inst.Files.Dir, ".mutti", "local")
+	if inst.runID != "" {
+		dir = filepath.Join(dir, "runs", inst.runID)
+	}
+	name := "compose.yml"
+	if len(overlays) > 0 {
+		name = "compose+" + strings.Join(overlays, "+") + ".yml"
+	}
+	return filepath.Join(dir, name)
+}
+
+// localDir is the project's .mutti/local, the place for what mutti keeps per worktree. It keeps
+// it out of git: in a repository without touching it, elsewhere with .mutti/.gitignore.
+func localDir(inst *Instance) (string, error) {
+	dir := filepath.Join(inst.Files.Dir, ".mutti", "local")
+	if inst.CommonDir != "" {
+		return dir, identity.EnsureExcluded(inst.CommonDir, ".mutti/local/")
+	}
+	return dir, identity.EnsureLocalIgnored(filepath.Dir(dir))
 }
 
 // compose runs a Compose command and turns a non-zero exit into an Error. Compose's output
@@ -294,7 +319,7 @@ func (a *App) Reset(ctx context.Context, dir string, opts UpOptions) (*UpResult,
 		return nil, err
 	}
 	if opts.empty() {
-		opts.Selection = a.lastSelection(inst.Name)
+		opts.Selection = a.lastSelection(inst)
 	}
 	a.runPreDown(ctx, inst, spec)
 	if err := a.compose(ctx, everyProfile(spec), "down", "--volumes", "--remove-orphans"); err != nil {
@@ -342,7 +367,7 @@ func (a *App) resolvePrepared(ctx context.Context, dir string, sel Selection) (*
 	// Using the instance counts for tidy --idle; looking at it (status, url, list) does not.
 	a.touch(inst.Name)
 	if sel.empty() {
-		sel = a.lastSelection(inst.Name)
+		sel = a.lastSelection(inst)
 	}
 	spec, err := a.prepare(ctx, inst, sel)
 	return inst, spec, err

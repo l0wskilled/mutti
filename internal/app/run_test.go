@@ -63,7 +63,7 @@ func TestRunOnTheHost(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(res.Logs, "services.log")); err != nil || res.Logs != filepath.Join(root, ".mutti", "local", "runs", res.RunID) {
 		t.Errorf("logs %s: %v", res.Logs, err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".git", "info", "exclude")); !strings.Contains(string(b), "/.mutti/local/\n") {
+	if b, _ := os.ReadFile(filepath.Join(root, ".git", "info", "exclude")); !strings.Contains(string(b), "\n.mutti/local/\n") {
 		t.Errorf("exclude %q", b)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".mutti", ".gitignore")); !os.IsNotExist(err) {
@@ -563,7 +563,7 @@ func TestRunFailsWhenTheSelectionCannotBeSaved(t *testing.T) {
 	h, _ := runHarness(t, webModel())
 	h.compose.Exit = func(args []string) int {
 		if args[0] == "up" {
-			dirs, _ := filepath.Glob(filepath.Join(filepath.Dir(h.app.Dirs.InstanceDir("x")), "shop-run-*"))
+			dirs, _ := filepath.Glob(filepath.Join(root, ".mutti", "local", "runs", "*"))
 			for _, d := range dirs {
 				_ = os.Mkdir(filepath.Join(d, "selection.json"), 0o700)
 			}

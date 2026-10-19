@@ -90,16 +90,10 @@ func (a *App) Run(ctx context.Context, dir string, opts RunOptions) (res *RunRes
 	inst := runInstance(base, runID)
 	res = &RunResult{RunID: runID, Instance: inst.Name, Logs: opts.LogsDir}
 	if res.Logs == "" {
-		res.Logs = filepath.Join(inst.Root, ".mutti", "local", "runs", runID)
-		// Keep the logs out of git: in a repository without touching it, elsewhere with .mutti/.gitignore.
-		var ignore error
-		if inst.CommonDir != "" {
-			ignore = identity.EnsureExcluded(inst.CommonDir, "/.mutti/local/")
-		} else {
-			ignore = identity.EnsureLocalIgnored(filepath.Join(inst.Root, ".mutti"))
-		}
-		if ignore != nil {
-			return res, ignore
+		local, err := localDir(inst)
+		res.Logs = filepath.Join(local, "runs", runID)
+		if err != nil {
+			return res, err
 		}
 	}
 
