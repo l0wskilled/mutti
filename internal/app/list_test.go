@@ -15,6 +15,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose"
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/gitdir"
+	"github.com/l0wskilled/mutti/internal/project"
 )
 
 func TestListSummarizes(t *testing.T) {
@@ -500,5 +501,42 @@ func TestRemoveNeedsNoWorktree(t *testing.T) {
 	}
 	if err := h.app.Remove(ctx, "../x"); err == nil {
 		t.Error("an invalid name")
+	}
+}
+
+func TestListPointsAtTheProjectInASubdirectory(t *testing.T) {
+	root := newRepo(t, "shop")
+	sub := filepath.Join(root, "deploy", "local")
+	writeFile(t, filepath.Join(sub, "compose.yml"), "services: {}\n")
+	h := newHarness(t, webModel())
+	if _, err := h.app.Up(ctx, sub, UpOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := h.app.List(ctx)
+	if err != nil || len(list) != 1 || list[0].Path != sub {
+		t.Fatalf("%+v %v", list, err)
+	}
+	// What the list says works for everything that takes a directory.
+	if _, err := h.app.Status(ctx, list[0].Path); err != nil {
+		t.Fatal(err)
+	}
+	// A gone worktree points at where it was.
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := h.app.List(ctx); list[0].Path != root || !list[0].Orphaned {
+		t.Errorf("gone: %+v", list[0])
+	}
+}
+
+func TestProjectDir(t *testing.T) {
+	for _, c := range []struct{ root, dir, want string }{
+		{"/r", "/r", "."},
+		{"/r", "/r/a/b", "a/b"},
+		{"/r", "/elsewhere", "."},
+	} {
+		if got := projectDir(&Instance{Root: c.root, Files: project.Files{Dir: c.dir}}); got != c.want {
+			t.Errorf("%+v: %q", c, got)
+		}
 	}
 }

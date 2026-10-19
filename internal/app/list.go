@@ -27,7 +27,7 @@ const (
 type Summary struct {
 	Name     string        `json:"name"`
 	Project  string        `json:"project"`
-	Path     string        `json:"path"`
+	Path     string        `json:"path"` // where its Compose project lives, a subdirectory of its worktree or the worktree
 	Branch   string        `json:"branch,omitempty"`
 	Status   string        `json:"status"`
 	Running  int           `json:"running"`
@@ -83,6 +83,9 @@ func (a *App) summarize(ctx context.Context, httpsPort uint16, claim engine.Volu
 		Project:  claim.Labels[engine.LabelProject],
 		Path:     root,
 		Orphaned: owner == ownerGone,
+	}
+	if dir := claim.Labels[LabelDir]; dir != "" && owner != ownerGone {
+		s.Path = filepath.Join(root, filepath.FromSlash(dir))
 	}
 	if owner != ownerGone {
 		if b, err := a.Git.Branch(ctx, root); err == nil {

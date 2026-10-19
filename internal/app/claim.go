@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/gitdir"
@@ -26,6 +27,9 @@ const (
 // LabelOrigin says where the paths in a resource's labels are valid (see origin).
 const LabelOrigin = "mutti.origin"
 
+// LabelDir is where the Compose project lives, relative to the worktree (engine.LabelPath).
+const LabelDir = "mutti.dir"
+
 func (a *App) labels(inst *Instance, role string) map[string]string {
 	return map[string]string{
 		LabelOrigin:          a.origin(),
@@ -36,7 +40,17 @@ func (a *App) labels(inst *Instance, role string) map[string]string {
 		engine.LabelID:       inst.ID,
 		engine.LabelPath:     inst.Root,
 		engine.LabelGitDir:   inst.GitDir,
+		LabelDir:             projectDir(inst),
 	}
+}
+
+// projectDir is the directory of the instance's Compose files relative to its worktree.
+func projectDir(inst *Instance) string {
+	rel, err := filepath.Rel(inst.Root, inst.Files.Dir)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "."
+	}
+	return filepath.ToSlash(rel)
 }
 
 // claim makes the instance name this worktree's. The claim is a labelled volume, so ownership
