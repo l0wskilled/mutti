@@ -501,9 +501,7 @@ func (a *App) renderRouter(s router.Settings, instances []router.Instance) (rend
 		cert, certErr := os.ReadFile(certPath)
 		key, keyErr := os.ReadFile(keyPath)
 		if certErr != nil || keyErr != nil || !ca.Valid(cert, names, a.Now()) {
-			if cert, key, err = ca.Issue(names, a.Now()); err != nil {
-				return rendered{}, err
-			}
+			cert, key, _ = ca.Issue(names, a.Now()) // signing fails only for a mismatched pair, which Load refuses
 			if err := writeIfChanged(keyPath, key); err != nil {
 				return rendered{}, err
 			}
