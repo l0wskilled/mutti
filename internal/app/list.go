@@ -95,9 +95,10 @@ func (a *App) summarize(ctx context.Context, httpsPort uint16, claim engine.Volu
 	}
 
 	urls := map[string]bool{}
-	main := ""
+	main, hostname := "", ""
 	done := settled(containers)
 	for _, c := range containers {
+		hostname = cmp.Or(hostname, c.Labels[LabelHostname])
 		if !done[c.ID] {
 			s.Total++
 		}
@@ -124,6 +125,11 @@ func (a *App) summarize(ctx context.Context, httpsPort uint16, claim engine.Volu
 				Routed:        routed && p.Proto != "udp",
 			})
 		}
+	}
+	// The main hostname comes first even without the main service's container: mutti down leaves
+	// the containers of optional services that ran.
+	if main == "" && hostname != "" && len(urls) > 0 {
+		main = hostURL(hostname, httpsPort)
 	}
 	if main != "" {
 		s.URLs = append(s.URLs, main)

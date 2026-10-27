@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -66,6 +67,18 @@ func TestListSummarizes(t *testing.T) {
 	h.eng.SetContainerState(cs[0].ID, "exited")
 	if s := summaryOf(t, h, "shop"); s.Status != StatusPartial || s.Running != 1 {
 		t.Fatalf("partial: %+v", s)
+	}
+
+	// Without the main service's container the main hostname still comes first.
+	for _, c := range cs {
+		if c.Labels[engine.LabelComposeService] == "web" {
+			if err := h.eng.RemoveContainer(ctx, c.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if s := summaryOf(t, h, "shop"); !slices.Equal(s.URLs, []string{"https://shop.localhost", "https://api.shop.localhost"}) {
+		t.Fatalf("without web: %v", s.URLs)
 	}
 }
 
