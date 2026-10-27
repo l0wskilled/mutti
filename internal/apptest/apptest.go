@@ -18,7 +18,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose/composetest"
 	"github.com/l0wskilled/mutti/internal/engine/enginetest"
 	"github.com/l0wskilled/mutti/internal/gitdir"
-	"github.com/l0wskilled/mutti/internal/xdg"
+	"github.com/l0wskilled/mutti/internal/home"
 )
 
 // World is an app on fakes and the repository it works on.
@@ -65,7 +65,7 @@ func New(t *testing.T) *World {
 	fc := composetest.New(eng, model)
 	a := &app.App{
 		Engine: eng, Compose: fc, Git: gitdir.Git{},
-		Dirs: xdg.Dirs{State: filepath.Join(base, "state"), Data: filepath.Join(base, "data")},
+		Dirs: home.Dirs{State: filepath.Join(base, "state"), Data: filepath.Join(base, "data")},
 		Host: app.Host{
 			UID: 1000, GID: 1000, Getenv: func(string) string { return "" }, LookPath: exec.LookPath,
 			SystemRoots: func() (*x509.CertPool, error) { return x509.NewCertPool(), nil }, DockerGID: -1, DockerSocket: "/var/run/docker.sock",

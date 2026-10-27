@@ -158,7 +158,7 @@ Where mutti cannot tell the host path of the worktree, set `MUTTI_HOST_ROOT`.
 
 The router is one per Docker daemon and serves the certificates of one mutti's local CA. A mutti
 in a container that should use the same router as mutti on the host needs the host's state:
-mount `~/.local/state/mutti` and `~/.local/share/mutti` to the same places in the container.
+mount `~/.mutti` to the same place in the container.
 Otherwise it refuses to touch the host's router; `MUTTI_ROUTER_NAME`, `MUTTI_HTTP_PORT` and
 `MUTTI_HTTPS_PORT` give it a router of its own.
 

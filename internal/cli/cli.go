@@ -147,7 +147,7 @@ func newRoot(d Deps, p *printer) *cobra.Command {
 	return root
 }
 
-// addCustomCommands registers the commands of the project's .mutti dir and the user's config
+// addCustomCommands registers the commands of the project's .mutti dir and the user's ~/.mutti
 // dir. A broken commands dir only warns, so mutti itself keeps working.
 func addCustomCommands(root *cobra.Command, d *Deps, reserved []string) {
 	dirs := []string{d.App.Dirs.Config}

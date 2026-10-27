@@ -22,11 +22,11 @@ exec curl -sSf --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.
 stdout '^'$MUTTI_TEST_RUN'-feature$'
 
 # HTTPS with a certificate of mutti's CA.
-exec curl -sSf --cacert $XDG_DATA_HOME/mutti/ca/ca.pem --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/name.txt
+exec curl -sSf --cacert $MUTTI_HOME/ca/ca.pem --resolve feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://feature.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/name.txt
 stdout '^'$MUTTI_TEST_RUN'-feature$'
 
 # Host route and path route to the api.
-exec curl -sSf --cacert $XDG_DATA_HOME/mutti/ca/ca.pem --resolve api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/api/ping.txt
+exec curl -sSf --cacert $MUTTI_HOME/ca/ca.pem --resolve api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT:127.0.0.1 https://api.$MUTTI_TEST_RUN.localhost:$MUTTI_HTTPS_PORT/api/ping.txt
 stdout '^pong$'
 exec curl -sSf --resolve $MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT:127.0.0.1 http://$MUTTI_TEST_RUN.localhost:$MUTTI_HTTP_PORT/api/ping.txt
 stdout '^pong$'

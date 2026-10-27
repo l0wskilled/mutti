@@ -24,8 +24,8 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose"
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/gitdir"
+	"github.com/l0wskilled/mutti/internal/home"
 	"github.com/l0wskilled/mutti/internal/hostenv"
-	"github.com/l0wskilled/mutti/internal/xdg"
 )
 
 // Set by the release build (.goreleaser.yaml).
@@ -48,10 +48,19 @@ func run() int {
 		stop()
 	}()
 
-	dirs, err := xdg.FromEnv(os.Getenv)
+	dirs, err := home.FromEnv(os.Getenv)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mutti:", err)
 		return cli.ExitError
+	}
+	if os.Getenv("MUTTI_HOME") == "" {
+		moved, err := home.Migrate(os.Getenv, dirs.State)
+		for _, old := range moved {
+			fmt.Fprintf(os.Stderr, "mutti: moved %s to %s\n", old, dirs.State)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "mutti: could not move older files to %s: %v\n", dirs.State, err)
+		}
 	}
 	cwd, err := os.Getwd()
 	if err != nil {

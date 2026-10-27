@@ -18,8 +18,8 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose/composetest"
 	"github.com/l0wskilled/mutti/internal/engine/enginetest"
 	"github.com/l0wskilled/mutti/internal/gitdir"
+	"github.com/l0wskilled/mutti/internal/home"
 	"github.com/l0wskilled/mutti/internal/project"
-	"github.com/l0wskilled/mutti/internal/xdg"
 )
 
 // env is a fixed environment for tests.
@@ -45,7 +45,7 @@ func newHarness(t *testing.T, model *compose.Model) *harness {
 		Engine:  eng,
 		Compose: fc,
 		Git:     gitdir.Git{},
-		Dirs:    xdg.Dirs{State: filepath.Join(t.TempDir(), "state"), Data: filepath.Join(t.TempDir(), "data")},
+		Dirs:    home.Dirs{State: filepath.Join(t.TempDir(), "state"), Data: filepath.Join(t.TempDir(), "data")},
 		Host:    Host{UID: 1000, GID: 1001, Getenv: env{}.get, LookPath: exec.LookPath, SystemRoots: func() (*x509.CertPool, error) { return x509.NewCertPool(), nil }, PortFree: func(uint16) bool { return true }, DockerGID: -1, DockerSocket: "/var/run/docker.sock"},
 		IO:      compose.IO{Err: &stderr},
 		Domain:  "localhost",

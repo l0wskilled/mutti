@@ -26,8 +26,8 @@ import (
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/engine/enginetest"
 	"github.com/l0wskilled/mutti/internal/gitdir"
+	"github.com/l0wskilled/mutti/internal/home"
 	"github.com/l0wskilled/mutti/internal/tui"
-	"github.com/l0wskilled/mutti/internal/xdg"
 )
 
 type world struct {
@@ -67,7 +67,7 @@ func newWorld(t *testing.T) *world {
 		Engine:  eng,
 		Compose: fc,
 		Git:     gitdir.Git{},
-		Dirs:    xdg.Dirs{State: filepath.Join(base, "state"), Data: filepath.Join(base, "data")},
+		Dirs:    home.Dirs{State: filepath.Join(base, "state"), Data: filepath.Join(base, "data")},
 		Host:    app.Host{UID: 1000, GID: 1000, Getenv: func(string) string { return "" }, LookPath: exec.LookPath, SystemRoots: func() (*x509.CertPool, error) { return x509.NewCertPool(), nil }},
 		IO:      compose.IO{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}},
 		Domain:  "localhost",

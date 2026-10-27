@@ -33,8 +33,7 @@ func TestScripts(t *testing.T) {
 		Setup: func(env *testscript.Env) error {
 			run := "t" + strings.ToLower(rand.Text()[:8])
 			env.Setenv("MUTTI_TEST_RUN", run)
-			env.Setenv("XDG_STATE_HOME", env.WorkDir+"/.state")
-			env.Setenv("XDG_DATA_HOME", env.WorkDir+"/.data")
+			env.Setenv("MUTTI_HOME", env.WorkDir+"/.mutti")
 			// A router of its own on free ports, so scenarios never touch a real one.
 			env.Setenv("MUTTI_ROUTER_NAME", "mutti-router-"+run)
 			env.Setenv("MUTTI_HTTP_PORT", freePort())

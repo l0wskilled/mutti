@@ -14,7 +14,7 @@ import (
 	"github.com/l0wskilled/mutti/internal/compose"
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/gitdir"
-	"github.com/l0wskilled/mutti/internal/xdg"
+	"github.com/l0wskilled/mutti/internal/home"
 )
 
 // Git is the part of the git binary mutti uses.
@@ -54,7 +54,7 @@ type App struct {
 	Engine  engine.Engine
 	Compose compose.Runner
 	Git     Git
-	Dirs    xdg.Dirs
+	Dirs    home.Dirs
 	Host    Host
 	IO      compose.IO // streams of commands run on the user's behalf
 	Domain  string     // base domain for hostnames, e.g. "localhost"
