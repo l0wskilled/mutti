@@ -21,7 +21,9 @@ URLs and ports. Start with status to see the environment of the current worktree
 exec runs commands inside a service, logs shows what services print, run executes a command
 (usually tests) against a throwaway copy with its own data. To work in parallel without touching
 the current environment, worktree_add creates a worktree with an environment of its own; pass its
-path as dir to the other tools. Errors carry a code and a hint on what to do.`
+path as dir to the other tools; worktree_remove removes it again. reset, destroy, tidy and sweep
+delete data: use them only when asked to. commands lists the project's own commands, command runs
+one. Errors carry a code and a hint on what to do.`
 
 // New returns the MCP server for the project at dir. Every tool call works on its own copy of a,
 // with output captured for the result: stdout belongs to the protocol.
@@ -42,6 +44,7 @@ func New(a *app.App, dir, version string) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{Name: "exec", Description: "Run a command in a running service of the environment and return its output and exit code.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &yes}}, s.exec)
 	mcp.AddTool(srv, &mcp.Tool{Name: "run", Description: "Run a command, usually tests, against a throwaway copy of the environment with its own data; the copy is removed afterwards.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no}}, s.run)
 	mcp.AddTool(srv, &mcp.Tool{Name: "worktree_add", Description: "Create a git worktree with its own environment, for parallel work, and start it.", Annotations: &mcp.ToolAnnotations{DestructiveHint: &no}}, s.worktreeAdd)
+	s.addManageTools(srv)
 	return srv
 }
 
@@ -293,6 +296,8 @@ type RunInput struct {
 	Start    []string `json:"start,omitempty" jsonschema:"start only these services and what they depend on; default: all"`
 	Overlays []string `json:"overlays,omitempty" jsonschema:"x-mutti overlays to enable"`
 	Profiles []string `json:"profiles,omitempty" jsonschema:"Compose profiles to enable"`
+	Build    bool     `json:"build,omitempty" jsonschema:"rebuild images before starting"`
+	User     string   `json:"user,omitempty" jsonschema:"with service: \"host\" (your user), \"service\" (the image's user) or user[:group]"`
 }
 
 // Ran is the result of a run.
@@ -311,7 +316,7 @@ func (s *server) run(ctx context.Context, _ *mcp.CallToolRequest, in RunInput) (
 	a, out := s.call()
 	res, err := a.Run(ctx, s.resolve(in.Dir), app.RunOptions{
 		Selection: app.Selection{Overlays: in.Overlays, Profiles: in.Profiles},
-		Services:  in.Start, Service: in.Service, Command: in.Command,
+		Build:     in.Build, Services: in.Start, Service: in.Service, User: in.User, Command: in.Command,
 	})
 	if err != nil {
 		return nil, Ran{}, toolErr(withOutput(err, out))
@@ -321,12 +326,16 @@ func (s *server) run(ctx context.Context, _ *mcp.CallToolRequest, in RunInput) (
 
 // WorktreeInput describes a new worktree.
 type WorktreeInput struct {
-	Dir      string `json:"dir,omitempty" jsonschema:"worktree directory, absolute or relative to where mutti mcp runs; default: that directory"`
-	Name     string `json:"name" jsonschema:"name of the worktree, also of its new branch: lower case letters, digits and -"`
-	Branch   string `json:"branch,omitempty" jsonschema:"check out this existing branch instead of creating one"`
-	From     string `json:"from,omitempty" jsonschema:"base of the new branch; default: the current HEAD"`
-	DataFrom string `json:"dataFrom,omitempty" jsonschema:"copy the data of another worktree's environment (\"main\", a name or a path) instead of starting empty"`
-	NoUp     bool   `json:"noUp,omitempty" jsonschema:"only create the worktree, do not start its environment"`
+	Dir      string   `json:"dir,omitempty" jsonschema:"worktree directory, absolute or relative to where mutti mcp runs; default: that directory"`
+	Name     string   `json:"name" jsonschema:"name of the worktree, also of its new branch: lower case letters, digits and -"`
+	Branch   string   `json:"branch,omitempty" jsonschema:"check out this existing branch instead of creating one"`
+	From     string   `json:"from,omitempty" jsonschema:"base of the new branch; default: the current HEAD"`
+	DataFrom string   `json:"dataFrom,omitempty" jsonschema:"copy the data of another worktree's environment (\"main\", a name or a path) instead of starting empty"`
+	Path     string   `json:"path,omitempty" jsonschema:"where to create the worktree; default: next to the main one as <repo>-<name>"`
+	NoUp     bool     `json:"noUp,omitempty" jsonschema:"only create the worktree, do not start its environment"`
+	Overlays []string `json:"overlays,omitempty" jsonschema:"x-mutti overlays to enable"`
+	Profiles []string `json:"profiles,omitempty" jsonschema:"Compose profiles to enable"`
+	Build    bool     `json:"build,omitempty" jsonschema:"rebuild images before starting"`
 }
 
 // Worktree describes a created worktree.
@@ -339,7 +348,8 @@ type Worktree struct {
 func (s *server) worktreeAdd(ctx context.Context, _ *mcp.CallToolRequest, in WorktreeInput) (*mcp.CallToolResult, Worktree, error) {
 	a, out := s.call()
 	res, err := a.WorktreeAdd(ctx, s.resolve(in.Dir), app.WorktreeAddOptions{
-		Name: in.Name, Branch: in.Branch, From: in.From, DataFrom: in.DataFrom, NoUp: in.NoUp,
+		Name: in.Name, Branch: in.Branch, From: in.From, Path: in.Path, DataFrom: in.DataFrom, NoUp: in.NoUp,
+		Up: app.UpOptions{Selection: app.Selection{Overlays: in.Overlays, Profiles: in.Profiles}, Build: in.Build},
 	})
 	if err != nil {
 		return nil, Worktree{}, toolErr(withOutput(err, out))

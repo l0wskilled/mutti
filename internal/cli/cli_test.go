@@ -954,7 +954,10 @@ func TestMCPServesOverTheCommandsStreams(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"diagnose", "down", "exec", "list", "logs", "restart", "run", "status", "stop", "up", "url", "worktree_add"}) {
+	if !slices.Equal(names, []string{
+		"attach", "command", "commands", "compose", "destroy", "diagnose", "doctor", "down", "env", "exec", "init", "list", "logs", "open",
+		"rename", "reset", "restart", "router_restart", "router_status", "run", "status", "stop", "sweep", "tidy", "up", "url", "worktree_add", "worktree_remove",
+	}) {
 		t.Errorf("tools %v", names)
 	}
 	if got := session.InitializeResult(); got != nil && got.ServerInfo.Version != "1.2.3" {

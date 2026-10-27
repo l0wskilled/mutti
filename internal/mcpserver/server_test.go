@@ -22,6 +22,12 @@ import (
 func setup(t *testing.T) (*mcp.ClientSession, *composetest.Fake, string) {
 	t.Helper()
 	w := apptest.New(t)
+	return connect(t, w), w.Compose, w.Root
+}
+
+// connect returns a client session to a server over the world's app and repository.
+func connect(t *testing.T, w *apptest.World) *mcp.ClientSession {
+	t.Helper()
 	ctx := context.Background()
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := New(w.App, w.Root, "test").Connect(ctx, st, nil); err != nil {
@@ -32,7 +38,7 @@ func setup(t *testing.T) (*mcp.ClientSession, *composetest.Fake, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = session.Close() })
-	return session, w.Compose, w.Root
+	return session
 }
 
 // call calls a tool and decodes its structured result into out; it returns the text of a tool error.
