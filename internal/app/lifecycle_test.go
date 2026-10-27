@@ -260,6 +260,18 @@ func TestPrepareFileErrors(t *testing.T) {
 			t.Fatal("want error")
 		}
 	})
+	t.Run(".mutti/local not ignorable", func(t *testing.T) {
+		h := newHarness(t, webModel())
+		inst, err := h.app.Resolve(ctx, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inst.CommonDir = filepath.Join(t.TempDir(), "file")
+		writeFile(t, inst.CommonDir, "")
+		if _, err := h.app.prepare(ctx, inst, Selection{}); err == nil {
+			t.Fatal("want error")
+		}
+	})
 	t.Run("override not writable", func(t *testing.T) {
 		h := newHarness(t, webModel())
 		inst, err := h.app.Resolve(ctx, root)
@@ -406,6 +418,14 @@ func TestPurgeFailures(t *testing.T) {
 			}
 		})
 	}
+	t.Run("router lock", func(t *testing.T) {
+		h := newHarness(t, webModel())
+		h.app.Dirs.State = filepath.Join(t.TempDir(), "file")
+		writeFile(t, h.app.Dirs.State, "")
+		if err := h.app.purge(ctx, "shop"); err == nil {
+			t.Fatal("want error")
+		}
+	})
 }
 
 func TestExec(t *testing.T) {
