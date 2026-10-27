@@ -13,6 +13,7 @@ import (
 
 	"github.com/l0wskilled/mutti/internal/engine"
 	"github.com/l0wskilled/mutti/internal/identity"
+	"github.com/l0wskilled/mutti/internal/lock"
 )
 
 // Status of an instance's containers.
@@ -252,7 +253,30 @@ func (a *App) purge(ctx context.Context, instance string) error {
 			return engineErr(err)
 		}
 	}
-	networks, err := a.Engine.ListNetworks(ctx, project)
+	if err := a.removeNetworks(ctx, instance); err != nil {
+		return err
+	}
+	volumes, err := a.Engine.ListVolumes(ctx, project)
+	if err != nil {
+		return engineErr(err)
+	}
+	for _, name := range append(volumeNames(volumes), bootstrapVolume(instance), claimVolume(instance)) {
+		if err := a.Engine.RemoveVolume(ctx, name); err != nil {
+			return engineErr(err)
+		}
+	}
+	return os.RemoveAll(a.Dirs.InstanceDir(instance))
+}
+
+// removeNetworks removes the networks of an instance. It holds the router lock, so a Reconcile
+// running meanwhile cannot attach the router again between detaching and removing.
+func (a *App) removeNetworks(ctx context.Context, instance string) error {
+	release, err := lock.Acquire(ctx, a.Dirs.LockFile("router"))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = release() }()
+	networks, err := a.Engine.ListNetworks(ctx, engine.LabelComposeProject+"="+instance)
 	if err != nil {
 		return engineErr(err)
 	}
@@ -269,16 +293,7 @@ func (a *App) purge(ctx context.Context, instance string) error {
 			return engineErr(err)
 		}
 	}
-	volumes, err := a.Engine.ListVolumes(ctx, project)
-	if err != nil {
-		return engineErr(err)
-	}
-	for _, name := range append(volumeNames(volumes), bootstrapVolume(instance), claimVolume(instance)) {
-		if err := a.Engine.RemoveVolume(ctx, name); err != nil {
-			return engineErr(err)
-		}
-	}
-	return os.RemoveAll(a.Dirs.InstanceDir(instance))
+	return nil
 }
 
 func volumeNames(vs []engine.Volume) []string {
