@@ -27,8 +27,8 @@ type WorktreeAddOptions struct {
 	Branch string // check out this existing branch instead of creating one
 	From   string // base of the new branch; empty: the current HEAD
 	Path   string // where to put it; empty: next to the main worktree as <repo>-<name>
-	// DataFrom copies the volumes of another worktree's instance ("main", a name or a path)
-	// instead of bootstrapping; after-clone hooks run instead of bootstrap hooks.
+	// DataFrom copies the volumes of another worktree's instance ("main", a worktree or instance
+	// name, or a path) instead of bootstrapping; after-clone hooks run instead of bootstrap hooks.
 	DataFrom string
 	NoUp     bool // only create the worktree
 	Up       UpOptions
@@ -85,7 +85,7 @@ func (a *App) WorktreeAdd(ctx context.Context, dir string, opts WorktreeAddOptio
 		}
 	}
 	if opts.DataFrom != "" {
-		if res.Cloned, err = a.cloneInto(ctx, path, a.sourceRoot(dir, info, opts.DataFrom)); err != nil {
+		if res.Cloned, err = a.cloneInto(ctx, path, a.sourceRoot(ctx, dir, info, opts.DataFrom)); err != nil {
 			return nil, undo(err)
 		}
 		opts.Up.afterClone = true

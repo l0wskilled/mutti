@@ -74,7 +74,7 @@ func TestDataFromSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, from := range map[string]string{"by-name": "first", "by-path": first.Path, "relative": "../shop-first"} {
+	for name, from := range map[string]string{"by-name": "first", "by-instance": "shop-first", "by-path": first.Path, "relative": "../shop-first"} {
 		if _, err := h.app.WorktreeAdd(ctx, root, WorktreeAddOptions{Name: name, DataFrom: from, NoUp: true}); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -84,6 +84,9 @@ func TestDataFromSources(t *testing.T) {
 	}
 	if _, err := h.app.WorktreeAdd(ctx, root, WorktreeAddOptions{Name: "nowhere", DataFrom: "/no/such/dir"}); appErrCode(err) != CodeNoSuchDir {
 		t.Errorf("unknown source: %v", err)
+	}
+	if _, err := h.app.WorktreeAdd(ctx, root, WorktreeAddOptions{Name: "nobody", DataFrom: "no-such-name"}); appErrCode(err) != CodeNoSuchDir {
+		t.Errorf("unknown name: %v", err)
 	}
 }
 

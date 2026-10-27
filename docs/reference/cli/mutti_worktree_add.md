@@ -11,7 +11,7 @@ mutti worktree add <name> [flags]
 ```
       --branch string      check out this existing branch (local or remote) instead of creating one
       --build              rebuild images before starting
-      --data-from string   copy the data of another worktree's instance ("main", a name or a path) instead of bootstrapping
+      --data-from string   copy the data of another worktree's instance ("main", a worktree or instance name, or a path) instead of bootstrapping
       --from string        base of the new branch (default: current HEAD)
   -h, --help               help for add
       --no-up              only create the worktree

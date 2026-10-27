@@ -20,8 +20,9 @@ const labelComposeVolume = "com.docker.compose.volume"
 // CodeNoData means the instance to copy data from has none.
 const CodeNoData = "no-data"
 
-// sourceRoot finds the worktree to copy data from: "main", a worktree name or a path.
-func (a *App) sourceRoot(dir string, info gitdir.Info, from string) string {
+// sourceRoot finds the worktree to copy data from: "main", a worktree name, an instance name as
+// mutti list shows it, or a path.
+func (a *App) sourceRoot(ctx context.Context, dir string, info gitdir.Info, from string) string {
 	if from == "main" {
 		return info.MainRoot()
 	}
@@ -31,7 +32,18 @@ func (a *App) sourceRoot(dir string, info gitdir.Info, from string) string {
 	if _, err := os.Stat(filepath.Join(dir, from)); err == nil {
 		return filepath.Join(dir, from)
 	}
-	return a.worktreePath(info, from)
+	path := a.worktreePath(info, from)
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	if list, err := a.List(ctx); err == nil {
+		for _, s := range list {
+			if s.Name == from && s.Path != "" {
+				return s.Path
+			}
+		}
+	}
+	return path
 }
 
 // cloneVolumes copies every named volume of src into the matching volume of dst, as Compose

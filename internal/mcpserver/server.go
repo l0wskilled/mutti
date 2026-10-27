@@ -330,7 +330,7 @@ type WorktreeInput struct {
 	Name     string   `json:"name" jsonschema:"name of the worktree, also of its new branch: lower case letters, digits and -"`
 	Branch   string   `json:"branch,omitempty" jsonschema:"check out this existing branch instead of creating one"`
 	From     string   `json:"from,omitempty" jsonschema:"base of the new branch; default: the current HEAD"`
-	DataFrom string   `json:"dataFrom,omitempty" jsonschema:"copy the data of another worktree's environment (\"main\", a name or a path) instead of starting empty"`
+	DataFrom string   `json:"dataFrom,omitempty" jsonschema:"copy the data of another worktree's environment (\"main\", a worktree or environment name, or a path) instead of starting empty"`
 	Path     string   `json:"path,omitempty" jsonschema:"where to create the worktree; default: next to the main one as <repo>-<name>"`
 	NoUp     bool     `json:"noUp,omitempty" jsonschema:"only create the worktree, do not start its environment"`
 	Overlays []string `json:"overlays,omitempty" jsonschema:"x-mutti overlays to enable"`

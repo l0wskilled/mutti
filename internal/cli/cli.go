@@ -854,7 +854,7 @@ func worktreeCmd(d *Deps, p *printer) *cobra.Command {
 	addCmd.Flags().StringVar(&add.Branch, "branch", "", "check out this existing branch (local or remote) instead of creating one")
 	addCmd.Flags().StringVar(&add.From, "from", "", "base of the new branch (default: current HEAD)")
 	addCmd.Flags().StringVar(&add.Path, "path", "", "where to create the worktree")
-	addCmd.Flags().StringVar(&add.DataFrom, "data-from", "", `copy the data of another worktree's instance ("main", a name or a path) instead of bootstrapping`)
+	addCmd.Flags().StringVar(&add.DataFrom, "data-from", "", `copy the data of another worktree's instance ("main", a worktree or instance name, or a path) instead of bootstrapping`)
 	addCmd.Flags().BoolVar(&add.NoUp, "no-up", false, "only create the worktree")
 	selectionFlags(addCmd, &add.Up.Selection)
 	addCmd.Flags().BoolVar(&add.Up.Build, "build", false, "rebuild images before starting")
