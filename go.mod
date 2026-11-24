@@ -3,24 +3,24 @@ module github.com/l0wskilled/mutti
 go 1.27
 
 require (
-	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.1.0
-	charm.land/lipgloss/v2 v2.0.6
-	github.com/charmbracelet/x/ansi v0.11.9
+	charm.land/bubbles/v2 v2.2.2
+	charm.land/bubbletea/v2 v2.1.1
+	charm.land/lipgloss/v2 v2.1.1
+	github.com/charmbracelet/x/ansi v0.11.10
 	github.com/containerd/errdefs v1.0.0
-	github.com/gofrs/flock v0.13.1
+	github.com/gofrs/flock v0.13.2
 	github.com/google/go-cmp v0.7.0
 	github.com/invopop/jsonschema v0.14.0
-	github.com/moby/moby/api v1.56.1
-	github.com/moby/moby/client v0.6.2
+	github.com/moby/moby/api v1.57.0
+	github.com/moby/moby/client v0.6.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/smallstep/truststore v0.13.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
-	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/term v0.47.0
+	github.com/spf13/pflag v1.1.0
+	go.yaml.in/yaml/v3 v3.0.6
+	golang.org/x/term v0.48.0
 )
 
 require (
@@ -46,13 +46,13 @@ require (
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
-	github.com/mattn/go-runewidth v0.0.30 // indirect
+	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/rivo/uniseg v0.4.8-0.20261110175422-3a370411ca06 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sahilm/fuzzy v0.1.3 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
@@ -67,7 +67,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
